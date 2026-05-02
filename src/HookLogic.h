@@ -1,10 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 
 namespace WalkSpeedTuner::HookLogic {
 
-    inline constexpr float kMaxBoostPct = 75.0f;
+    inline constexpr float kMaxBoostPct   = 75.0f;
+    inline constexpr float kHotkeyStepPct = 10.0f;
 
     struct BoostInputs {
         float base;
@@ -30,6 +32,29 @@ namespace WalkSpeedTuner::HookLogic {
                              std::int64_t last_ns,
                              std::int64_t throttle_ns) {
         return (now_ns - last_ns) >= throttle_ns;
+    }
+
+    inline float BumpBoost(float current, float step, float max) {
+        return std::clamp(current + step, 0.0f, max);
+    }
+
+    enum class HotkeyAction { kNone, kBoostUp, kBoostDown };
+
+    struct HotkeyConfig {
+        std::uint32_t up_key;
+        std::uint8_t  up_mods;
+        std::uint32_t down_key;
+        std::uint8_t  down_mods;
+    };
+
+    inline HotkeyAction MatchHotkey(std::uint32_t key, std::uint8_t mods,
+                                    const HotkeyConfig& cfg) {
+        if (key == 0) return HotkeyAction::kNone;
+        if (cfg.up_key   != 0 && key == cfg.up_key   && mods == cfg.up_mods)
+            return HotkeyAction::kBoostUp;
+        if (cfg.down_key != 0 && key == cfg.down_key && mods == cfg.down_mods)
+            return HotkeyAction::kBoostDown;
+        return HotkeyAction::kNone;
     }
 
 }

@@ -20,6 +20,7 @@ if(NOT BUILD_TESTING)
 
     add_commonlibsse_plugin(${PROJECT_NAME}
         SOURCES
+            src/Hotkey.cpp
             src/Main.cpp
             src/MCM.cpp
             src/Settings.cpp
@@ -78,6 +79,8 @@ if(BUILD_TESTING)
         tests/test_compute.cpp
         tests/test_throttle.cpp
         tests/test_settings.cpp
+        tests/test_bump.cpp
+        tests/test_match.cpp
         src/SettingsParse.cpp
     )
 

@@ -12,6 +12,10 @@ TEST_CASE("missing JSON returns defaults", "[settings]") {
     REQUIRE(d.boost_pct == 0.0f);
     REQUIRE(d.suppress_in_combat == true);
     REQUIRE(d.sync_animation == false);
+    REQUIRE(d.boost_up_keycode == 0u);
+    REQUIRE(d.boost_up_mods == 0u);
+    REQUIRE(d.boost_down_keycode == 0u);
+    REQUIRE(d.boost_down_mods == 0u);
 }
 
 TEST_CASE("malformed JSON returns defaults", "[settings]") {
@@ -67,6 +71,10 @@ TEST_CASE("round-trip preserves all fields", "[settings]") {
         /*boost_pct*/ 35.0f,
         /*suppress_in_combat*/ false,
         /*sync_animation*/ true,
+        /*boost_up_keycode*/ 0x1B,
+        /*boost_up_mods*/ 0,
+        /*boost_down_keycode*/ 0x1B,
+        /*boost_down_mods*/ 4,
     };
     auto json   = DocumentToJsonString(original);
     auto parsed = ParseDocumentFromJson(json);
@@ -74,6 +82,33 @@ TEST_CASE("round-trip preserves all fields", "[settings]") {
     REQUIRE(parsed.boost_pct == original.boost_pct);
     REQUIRE(parsed.suppress_in_combat == original.suppress_in_combat);
     REQUIRE(parsed.sync_animation == original.sync_animation);
+    REQUIRE(parsed.boost_up_keycode == original.boost_up_keycode);
+    REQUIRE(parsed.boost_up_mods == original.boost_up_mods);
+    REQUIRE(parsed.boost_down_keycode == original.boost_down_keycode);
+    REQUIRE(parsed.boost_down_mods == original.boost_down_mods);
+}
+
+TEST_CASE("clamps keycode above 0xFF", "[settings]") {
+    auto d = ParseDocumentFromJson(R"({"boost_up_keycode": 99999})");
+    REQUIRE(d.boost_up_keycode == 0xFFu);
+}
+
+TEST_CASE("clamps mods above 0x07", "[settings]") {
+    auto d = ParseDocumentFromJson(R"({"boost_up_mods": 99})");
+    REQUIRE(d.boost_up_mods == 0x07u);
+}
+
+TEST_CASE("default chords are unbound", "[settings]") {
+    auto d = ParseDocumentFromJson("{}");
+    REQUIRE(d.boost_up_keycode == 0u);
+    REQUIRE(d.boost_up_mods == 0u);
+    REQUIRE(d.boost_down_keycode == 0u);
+    REQUIRE(d.boost_down_mods == 0u);
+}
+
+TEST_CASE("negative keycode clamps to zero", "[settings]") {
+    auto d = ParseDocumentFromJson(R"({"boost_up_keycode": -5})");
+    REQUIRE(d.boost_up_keycode == 0u);
 }
 
 TEST_CASE("default doc round-trips cleanly", "[settings]") {

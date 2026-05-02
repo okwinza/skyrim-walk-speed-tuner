@@ -3,6 +3,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 
+#include "Hotkey.h"
 #include "MCM.h"
 #include "Settings.h"
 #include "WalkSpeedHook.h"
@@ -13,16 +14,21 @@ namespace {
         spdlog::info("[Main] kDataLoaded");
         WalkSpeedTuner::Settings::Load();
 
-        if (auto* task = SKSE::GetTaskInterface()) {
-            task->AddTask([] { WalkSpeedTuner::MCM::Register(); });
-        } else {
+        auto register_ui = [] {
             WalkSpeedTuner::MCM::Register();
+            WalkSpeedTuner::Hotkey::Install();
+        };
+        if (auto* task = SKSE::GetTaskInterface()) {
+            task->AddTask(register_ui);
+        } else {
+            register_ui();
         }
     }
 
     void OnPostLoadGame() {
-        spdlog::info("[Main] kPostLoadGame — tickling cache");
+        spdlog::info("[Main] kPostLoadGame — tickling cache + resetting modifier state");
         WalkSpeedTuner::WalkSpeedHook::TickleNow();
+        WalkSpeedTuner::Hotkey::ResetModifierState();
     }
 
     void OnMessage(SKSE::MessagingInterface::Message* message) {

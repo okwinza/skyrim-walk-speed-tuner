@@ -7,6 +7,7 @@
 #include "Settings.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include <nlohmann/json.hpp>
 
@@ -37,6 +38,25 @@ namespace WalkSpeedTuner::Settings {
                 return def;
             }
         }
+
+        std::uint32_t ReadUInt32Clamped(const json& j, const char* key,
+                                        std::uint32_t def, std::uint32_t lo, std::uint32_t hi) {
+            if (!j.is_object() || !j.contains(key)) return def;
+            try {
+                if (!j.at(key).is_number()) return def;
+                const auto raw = j.at(key).get<long long>();
+                if (raw < 0) return lo;
+                const auto v = static_cast<std::uint32_t>(std::min<long long>(raw, hi));
+                return std::clamp(v, lo, hi);
+            } catch (...) {
+                return def;
+            }
+        }
+
+        std::uint8_t ReadUInt8Clamped(const json& j, const char* key,
+                                      std::uint8_t def, std::uint8_t lo, std::uint8_t hi) {
+            return static_cast<std::uint8_t>(ReadUInt32Clamped(j, key, def, lo, hi));
+        }
     }
 
     ConfigDocument ParseDocumentFromJson(std::string_view text) {
@@ -53,6 +73,10 @@ namespace WalkSpeedTuner::Settings {
                                                 0.0f, HookLogic::kMaxBoostPct);
         d.suppress_in_combat = ReadBool(j,         "suppress_in_combat", d.suppress_in_combat);
         d.sync_animation     = ReadBool(j,         "sync_animation",     d.sync_animation);
+        d.boost_up_keycode   = ReadUInt32Clamped(j, "boost_up_keycode",   d.boost_up_keycode,   0, 0xFF);
+        d.boost_up_mods      = ReadUInt8Clamped(j,  "boost_up_mods",      d.boost_up_mods,      0, 0x07);
+        d.boost_down_keycode = ReadUInt32Clamped(j, "boost_down_keycode", d.boost_down_keycode, 0, 0xFF);
+        d.boost_down_mods    = ReadUInt8Clamped(j,  "boost_down_mods",    d.boost_down_mods,    0, 0x07);
         return d;
     }
 
@@ -62,6 +86,10 @@ namespace WalkSpeedTuner::Settings {
             { "boost_pct",          d.boost_pct },
             { "suppress_in_combat", d.suppress_in_combat },
             { "sync_animation",     d.sync_animation },
+            { "boost_up_keycode",   d.boost_up_keycode },
+            { "boost_up_mods",      d.boost_up_mods },
+            { "boost_down_keycode", d.boost_down_keycode },
+            { "boost_down_mods",    d.boost_down_mods },
         };
         return j.dump(/*indent*/ 2);
     }

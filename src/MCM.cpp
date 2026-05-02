@@ -7,6 +7,7 @@
 #include "SKSEMenuFramework.h"
 
 #include "HookLogic.h"
+#include "Hotkey.h"
 #include "Settings.h"
 #include "WalkSpeedHook.h"
 
@@ -32,7 +33,65 @@ namespace WalkSpeedTuner::MCM {
             Settings::Save(g_edit);
         }
 
+        bool ConfirmModal(const char* popup_id, const char* title, const char* body) {
+            bool confirmed = false;
+            if (ImGui::BeginPopupModal(popup_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("%s", title);
+                ImGui::Spacing();
+                ImGui::TextWrapped("%s", body);
+                ImGui::Spacing();
+                if (ImGui::Button("Confirm", ImVec2(120, 0))) {
+                    confirmed = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+            return confirmed;
+        }
+
+        void RenderHotkeyRow(const char* label, Hotkey::Target target,
+                             std::uint32_t* edit_keycode, std::uint8_t* edit_mods) {
+            ImGui::PushID(label);
+
+            const auto capturing = Hotkey::CapturingTarget();
+            const bool this_capturing = (capturing == target);
+
+            const std::string display = this_capturing
+                ? std::string("Press a key (or Ctrl/Alt/Shift + key)...")
+                : Hotkey::ChordName(*edit_keycode, *edit_mods);
+
+            ImGui::Text("%-8s", label);
+            ImGui::SameLine(100.0f);
+            ImGui::TextDisabled("%s", display.c_str());
+            ImGui::SameLine(360.0f);
+
+            if (ImGui::Button(this_capturing ? "Cancel" : "Set", ImVec2(70, 0))) {
+                if (this_capturing) Hotkey::CancelCapture();
+                else                Hotkey::BeginCapture(target);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear", ImVec2(70, 0))) {
+                *edit_keycode = 0;
+                *edit_mods    = 0;
+                CommitEdit();
+            }
+
+            ImGui::PopID();
+        }
+
         void __stdcall RenderTab() {
+            // The InputEvent callback writes captured chords directly to the
+            // Hotkey atomics, not into g_edit. Re-sync each render so the
+            // displayed chord updates immediately after a capture completes.
+            g_edit.boost_up_keycode   = Hotkey::GetBoostUpKey();
+            g_edit.boost_up_mods      = Hotkey::GetBoostUpMods();
+            g_edit.boost_down_keycode = Hotkey::GetBoostDownKey();
+            g_edit.boost_down_mods    = Hotkey::GetBoostDownMods();
+
             bool changed = false;
 
             // ---- Master enable ----
@@ -95,6 +154,19 @@ namespace WalkSpeedTuner::MCM {
                 "higher boosts.");
             ImGui::EndDisabled();
 
+            // ---- Hotkeys ----
+            ImGui::SeparatorText("Hotkeys");
+            ImGui::BeginDisabled(!g_edit.enabled);
+            RenderHotkeyRow("Boost +", Hotkey::Target::kBoostUp,
+                            &g_edit.boost_up_keycode, &g_edit.boost_up_mods);
+            RenderHotkeyRow("Boost -", Hotkey::Target::kBoostDown,
+                            &g_edit.boost_down_keycode, &g_edit.boost_down_mods);
+            ImGui::EndDisabled();
+            ImGui::TextDisabled(
+                "Step: %.0f%%. Bind a key or Ctrl/Alt/Shift + key. Hotkeys "
+                "are ignored while this menu is open. ESC during capture "
+                "cancels.", HookLogic::kHotkeyStepPct);
+
             // ---- Live status ----
             ImGui::SeparatorText("Status");
             const bool active = WalkSpeedHook::IsBoostActiveRightNow();
@@ -121,6 +193,25 @@ namespace WalkSpeedTuner::MCM {
                     "Never writes any persistent actor value — fully save-"
                     "clean. If you uninstall the mod, your saves contain "
                     "zero residue.");
+            }
+
+            // ---- Danger zone ----
+            ImGui::SeparatorText("Danger zone");
+            if (ImGui::Button("Reset All to defaults", ImVec2(180, 0))) {
+                ImGui::OpenPopup("Confirm##reset_all");
+            }
+            WrappedTooltip(
+                "Restores all settings to defaults (boost = 0, suppress in "
+                "combat = on, animation sync = off, hotkeys cleared) and "
+                "rewrites the JSON config.\n\nNote: this mod never writes "
+                "to your save — uninstalling the DLL leaves zero residue. "
+                "The Reset button is convenience only.");
+            if (ConfirmModal("Confirm##reset_all",
+                             "Reset Walk Speed Tuner?",
+                             "Restore all MCM settings to defaults and "
+                             "rewrite the JSON config. Cannot be undone.")) {
+                Settings::Save(Settings::ConfigDocument{});
+                g_edit = Settings::CurrentDocument();
             }
 
             if (changed) CommitEdit();

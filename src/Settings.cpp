@@ -8,6 +8,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "Hotkey.h"
 #include "WalkSpeedHook.h"
 
 namespace WalkSpeedTuner::Settings {
@@ -21,9 +22,13 @@ namespace WalkSpeedTuner::Settings {
         WalkSpeedHook::SetBoostPercent(d.boost_pct);
         WalkSpeedHook::SetSuppressInCombat(d.suppress_in_combat);
         WalkSpeedHook::SetSyncAnimation(d.sync_animation);
+        Hotkey::SetBoostUpKey(d.boost_up_keycode, d.boost_up_mods);
+        Hotkey::SetBoostDownKey(d.boost_down_keycode, d.boost_down_mods);
 
-        spdlog::info("[Settings] applied: enabled={} boost={:.1f}% suppress_in_combat={} sync_animation={}",
-                     d.enabled, d.boost_pct, d.suppress_in_combat, d.sync_animation);
+        spdlog::info("[Settings] applied: enabled={} boost={:.1f}% suppress={} sync={} up={} down={}",
+                     d.enabled, d.boost_pct, d.suppress_in_combat, d.sync_animation,
+                     Hotkey::ChordName(d.boost_up_keycode,   d.boost_up_mods),
+                     Hotkey::ChordName(d.boost_down_keycode, d.boost_down_mods));
     }
 
     void Save(const ConfigDocument& d) {
@@ -85,6 +90,10 @@ namespace WalkSpeedTuner::Settings {
             WalkSpeedHook::GetBoostPercent(),
             WalkSpeedHook::GetSuppressInCombat(),
             WalkSpeedHook::GetSyncAnimation(),
+            Hotkey::GetBoostUpKey(),
+            Hotkey::GetBoostUpMods(),
+            Hotkey::GetBoostDownKey(),
+            Hotkey::GetBoostDownMods(),
         };
     }
 
