@@ -1,0 +1,16 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+    "name": "walk-speed-tuner",
+    "version": "1.0.0",
+    "default-features": [ "plugin" ],
+    "features": {
+        "plugin": {
+            "description": "SKSE plugin DLL (depends on CommonLibSSE-NG)",
+            "dependencies": [ "commonlibsse-ng", "nlohmann-json" ]
+        },
+        "tests": {
+            "description": "Catch2 unit tests for pure-function modules (no SKSE)",
+            "dependencies": [ "catch2", "nlohmann-json" ]
+        }
+    }
+}

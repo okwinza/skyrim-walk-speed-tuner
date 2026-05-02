@@ -1,0 +1,10 @@
+build/
+install/
+.vs/
+.vscode/
+out/
+*.log
+CMakeUserPresets.json
+vcpkg_installed/
+release/
+*.zip
