@@ -54,6 +54,18 @@ namespace WalkSpeedTuner::Hotkey {
 
         const char* KeyName(std::uint32_t code) {
             switch (code) {
+                // Mouse buttons + wheel (extended encoding)
+                case 0x100: return "LMB";
+                case 0x101: return "RMB";
+                case 0x102: return "MMB";
+                case 0x103: return "Mouse4";
+                case 0x104: return "Mouse5";
+                case 0x105: return "Mouse6";
+                case 0x106: return "Mouse7";
+                case 0x107: return "Mouse8";
+                case 0x108: return "WheelUp";
+                case 0x109: return "WheelDown";
+
                 case 0x01: return "Esc";
                 case 0x02: return "1"; case 0x03: return "2"; case 0x04: return "3";
                 case 0x05: return "4"; case 0x06: return "5"; case 0x07: return "6";
@@ -111,24 +123,28 @@ namespace WalkSpeedTuner::Hotkey {
             for (auto* ev = head; ev; ev = ev->next) {
                 auto* btn = ev->AsButtonEvent();
                 if (!btn) continue;
-                if (btn->device.get() != RE::INPUT_DEVICE::kKeyboard) continue;
+                const auto dev = btn->device.get();
+                if (dev != RE::INPUT_DEVICE::kKeyboard && dev != RE::INPUT_DEVICE::kMouse) continue;
 
-                const auto code     = btn->GetIDCode();
+                const auto rawCode  = btn->GetIDCode();
+                const auto encoded  = HookLogic::EncodeKeycode(static_cast<int>(dev), rawCode);
                 const bool pressed  = btn->IsPressed();
                 const bool downEdge = btn->IsDown();
 
-                switch (code) {
-                    case kLCtrl: case kRCtrl:
-                        g_ctrl_down.store(pressed, std::memory_order_relaxed);  break;
-                    case kLAlt: case kRAlt:
-                        g_alt_down.store(pressed, std::memory_order_relaxed);   break;
-                    case kLShift: case kRShift:
-                        g_shift_down.store(pressed, std::memory_order_relaxed); break;
-                    default: break;
+                if (dev == RE::INPUT_DEVICE::kKeyboard) {
+                    switch (rawCode) {
+                        case kLCtrl: case kRCtrl:
+                            g_ctrl_down.store(pressed, std::memory_order_relaxed);  break;
+                        case kLAlt: case kRAlt:
+                            g_alt_down.store(pressed, std::memory_order_relaxed);   break;
+                        case kLShift: case kRShift:
+                            g_shift_down.store(pressed, std::memory_order_relaxed); break;
+                        default: break;
+                    }
                 }
 
                 if (!downEdge) continue;
-                if (IsModifierScanCode(code)) continue;
+                if (dev == RE::INPUT_DEVICE::kKeyboard && IsModifierScanCode(rawCode)) continue;
 
                 const std::uint8_t mods = CurrentModMask();
 
@@ -136,17 +152,26 @@ namespace WalkSpeedTuner::Hotkey {
                     const auto target = g_capturing_target.load(std::memory_order_relaxed);
                     if (target == static_cast<int>(Target::kNone)) continue;
 
-                    if (code == kEsc) {
+                    // ESC during capture cancels (keyboard only).
+                    if (dev == RE::INPUT_DEVICE::kKeyboard && rawCode == kEsc) {
                         g_capturing_target.store(static_cast<int>(Target::kNone),
                                                  std::memory_order_relaxed);
                         spdlog::info("[Hotkey] capture canceled (ESC)");
                         continue;
                     }
 
+                    // LMB/RMB clicks during capture are MCM-interaction events
+                    // (clicking buttons, sliders, etc.), not the user's "press
+                    // a key to bind" gesture. Discard them.
+                    if (encoded == HookLogic::kMouseBase + 0 ||
+                        encoded == HookLogic::kMouseBase + 1) {
+                        continue;
+                    }
+
                     if (target == static_cast<int>(Target::kBoostUp)) {
-                        SetBoostUpKey(code, mods);
+                        SetBoostUpKey(encoded, mods);
                     } else {
-                        SetBoostDownKey(code, mods);
+                        SetBoostDownKey(encoded, mods);
                     }
                     g_capturing_target.store(static_cast<int>(Target::kNone),
                                              std::memory_order_relaxed);
@@ -159,7 +184,7 @@ namespace WalkSpeedTuner::Hotkey {
                     up_k,   g_up_mods.load(std::memory_order_relaxed),
                     down_k, g_down_mods.load(std::memory_order_relaxed),
                 };
-                switch (HookLogic::MatchHotkey(code, mods, cfg)) {
+                switch (HookLogic::MatchHotkey(encoded, mods, cfg)) {
                     case HookLogic::HotkeyAction::kBoostUp:
                         WalkSpeedHook::SetBoostPercent(
                             HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),

@@ -8,6 +8,19 @@ namespace WalkSpeedTuner::HookLogic {
     inline constexpr float kMaxBoostPct   = 75.0f;
     inline constexpr float kHotkeyStepPct = 10.0f;
 
+    // Extended scan-code encoding (SkyUI/MCM-Helper convention) so mouse
+    // wheel/buttons don't collide with keyboard scan codes.
+    inline constexpr std::uint32_t kKbBase     = 0x000;   // 0x000-0x0FF DX scan codes
+    inline constexpr std::uint32_t kMouseBase  = 0x100;   // 0x100-0x109 mouse buttons + wheel
+    inline constexpr std::uint32_t kKeycodeMax = 0x1FF;
+
+    // device matches RE::INPUT_DEVICE: kKeyboard=0, kMouse=1, kGamepad=2.
+    inline std::uint32_t EncodeKeycode(int device, std::uint32_t idCode) {
+        if (device == 0) return kKbBase    + idCode;
+        if (device == 1) return kMouseBase + idCode;
+        return 0;
+    }
+
     struct BoostInputs {
         float base;
         float boost_pct;

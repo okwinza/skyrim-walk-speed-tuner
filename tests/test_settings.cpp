@@ -88,9 +88,22 @@ TEST_CASE("round-trip preserves all fields", "[settings]") {
     REQUIRE(parsed.boost_down_mods == original.boost_down_mods);
 }
 
-TEST_CASE("clamps keycode above 0xFF", "[settings]") {
+TEST_CASE("clamps keycode above 0x1FF", "[settings]") {
     auto d = ParseDocumentFromJson(R"({"boost_up_keycode": 99999})");
-    REQUIRE(d.boost_up_keycode == 0xFFu);
+    REQUIRE(d.boost_up_keycode == 0x1FFu);
+}
+
+TEST_CASE("accepts mouse-encoded keycode (Ctrl+WheelUp)", "[settings]") {
+    auto d = ParseDocumentFromJson(R"({"boost_up_keycode": 264, "boost_up_mods": 1})");
+    REQUIRE(d.boost_up_keycode == 0x108u);
+    REQUIRE(d.boost_up_mods == 0x01u);
+}
+
+TEST_CASE("v1.1 keyboard JSON loads unchanged in v1.2", "[settings]") {
+    // v1.1 JSONs that bound keyboard 0x1B (the ']' key) must still parse to 0x1B,
+    // not be silently rebound to mouse-LMB or anything else.
+    auto d = ParseDocumentFromJson(R"({"boost_up_keycode": 27})");
+    REQUIRE(d.boost_up_keycode == 27u);
 }
 
 TEST_CASE("clamps mods above 0x07", "[settings]") {

@@ -73,9 +73,9 @@ namespace WalkSpeedTuner::Settings {
                                                 0.0f, HookLogic::kMaxBoostPct);
         d.suppress_in_combat = ReadBool(j,         "suppress_in_combat", d.suppress_in_combat);
         d.sync_animation     = ReadBool(j,         "sync_animation",     d.sync_animation);
-        d.boost_up_keycode   = ReadUInt32Clamped(j, "boost_up_keycode",   d.boost_up_keycode,   0, 0xFF);
+        d.boost_up_keycode   = ReadUInt32Clamped(j, "boost_up_keycode",   d.boost_up_keycode,   0, HookLogic::kKeycodeMax);
         d.boost_up_mods      = ReadUInt8Clamped(j,  "boost_up_mods",      d.boost_up_mods,      0, 0x07);
-        d.boost_down_keycode = ReadUInt32Clamped(j, "boost_down_keycode", d.boost_down_keycode, 0, 0xFF);
+        d.boost_down_keycode = ReadUInt32Clamped(j, "boost_down_keycode", d.boost_down_keycode, 0, HookLogic::kKeycodeMax);
         d.boost_down_mods    = ReadUInt8Clamped(j,  "boost_down_mods",    d.boost_down_mods,    0, 0x07);
         return d;
     }
