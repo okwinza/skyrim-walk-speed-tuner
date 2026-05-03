@@ -1,64 +1,65 @@
 # Walk Speed Tuner
 
-SKSE plugin for Skyrim SE/AE that lets the player walk faster without
-touching anything else. Adds a configurable boost (0–110%) to your
-`SpeedMult` while you are in walk gait. Sprint, run, sneak, and NPCs are
-untouched.
+A small SKSE plugin that lets you walk faster in Skyrim SE/AE. Adds a
+configurable boost (0–110%) to your walk speed only — sprint, run, sneak,
+and NPCs are untouched.
 
-## Architecture (the selling point)
-
-The hook intercepts `ActorValueOwner::GetActorValue(kSpeedMult)` and returns
-the boosted value when the player is walking. The underlying actor value is
-**never modified**.
-
-- Saves are byte-identical to vanilla
-- Removing `WalkSpeedTuner.dll` returns the player to vanilla speed instantly
-- No script-extender persistence, no co-save data, no orphan drift
-
-A 25 ms-throttled `ModActorValue(kCarryWeight, ±0.10)` "tickle" defeats the
-engine's lazy `MiddleHighProcessData` cache when the boost changes mid-game.
-Pattern adapted from
-[DanjelPiDev/TES5-DynamicSpeedController](https://github.com/DanjelPiDev/TES5-DynamicSpeedController)
-(Apache-2.0).
+**Save-clean.** The plugin never writes to your character's actor values.
+Your saves stay byte-identical to vanilla, and removing the DLL takes you
+straight back to vanilla speed — no orphan effects, no co-save data, no
+script residue.
 
 ## Features
 
-- 0–110% boost on the walk gait (5% step via hotkey)
-- Optional combat suppression (default on)
-- Default hotkeys: **Alt + Mouse Wheel Up / Down** to bump boost ±5%
-- Configurable bindings — keyboard or mouse, with Ctrl/Alt/Shift modifiers
-- Bound mouse-wheel chord no longer triggers vanilla third- or first-person
-  camera zoom (surgical vfunc hook on `PlayerInputHandler::ProcessButton`)
-- MCM panel via [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352)
-  (soft dependency — JSON config remains canonical without it)
+- 0–110% walk-speed boost (default: off)
+- **Alt + Mouse Wheel Up / Down** to bump boost ±5% on the fly
+- Optional: vanilla speed during combat (default on)
+- In-game settings panel (with [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352))
+- Hotkeys are rebindable — keyboard or mouse, with Ctrl/Alt/Shift modifiers
+- Bound mouse-wheel hotkeys won't trigger vanilla camera zoom
 
 ## Requirements
 
 - Skyrim Special Edition / Anniversary Edition (1.6.x) with
   [SKSE64](https://skse.silverlock.org/)
-- Optional: SKSEMenuFramework, for the in-game MCM panel
+- Optional: [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352)
+  for the in-game settings panel
 
 ## Installation
 
-Drop the contents of the release zip into your `Data/` folder, or install
-the zip with your mod manager (MO2 / Vortex). The DLL lands at
-`Data/SKSE/Plugins/WalkSpeedTuner.dll`.
+Download the latest `WalkSpeedTuner-vX.Y.Z.zip` from the
+[Releases](https://github.com/<owner>/WalkSpeedTuner/releases) page, then:
 
-## Configuration
+- **Mod Organizer 2 / Vortex**: drag the zip into your manager and install.
+- **Manual**: extract into your Skyrim `Data\` folder. The DLL lands at
+  `Data\SKSE\Plugins\WalkSpeedTuner.dll`.
 
-In-game (with SKSEMenuFramework): open the SKSE menu → **Walk Speed Tuner**.
+## Usage
 
-The panel exposes:
-- **Enable** — master toggle. Off = vanilla behavior.
-- **Boost** — 0–110% slider.
-- **Suppression** — revert to vanilla speed during combat.
-- **Hotkeys** — rebind Boost+ / Boost-. Press Set, then a key or
-  Ctrl/Alt/Shift+key. ESC cancels.
-- **Reset All to defaults**.
+1. Toggle walk gait — Caps Lock by default, or whatever you bound to
+   "Always Walk".
+2. Hold **Alt** and scroll the mouse wheel — up to walk faster, down to
+   slow down. Each click changes boost by 5%, up to a maximum of 110%.
 
-Without SKSEMenuFramework, edit
-`Data/SKSE/Plugins/WalkSpeedTuner.json` directly. Defaults are written on
-first run if the file is missing.
+The boost only applies while you're walking. Sprint, run, and sneak speeds
+are unchanged.
+
+## Settings
+
+**With SKSEMenuFramework**: open the SKSE menu in-game →
+**Walk Speed Tuner**.
+
+| Setting                | What it does                                                          |
+| ---------------------- | --------------------------------------------------------------------- |
+| Enable                 | Master toggle. Off = vanilla speed.                                   |
+| Boost (%)              | 0 to 110.                                                             |
+| Suppress during combat | Revert to vanilla speed during fights.                                |
+| Hotkeys                | Rebind Boost+ / Boost-. Click *Set*, press a key (or modifier+key). ESC cancels. |
+| Reset All              | Restore defaults (boost 0, hotkeys Alt+Wheel).                        |
+
+**Without SKSEMenuFramework**: edit
+`Data\SKSE\Plugins\WalkSpeedTuner.json` directly. The file is created on
+first run with these defaults:
 
 ```json
 {
@@ -72,14 +73,23 @@ first run if the file is missing.
 }
 ```
 
-Keycodes use the SkyUI / MCM-Helper extended-scan-code convention:
-- `0x000–0x0FF` — keyboard DX scan codes
-- `0x100–0x107` — mouse buttons (LMB, RMB, MMB, Mouse4–8)
-- `0x108` — wheel up
-- `0x109` — wheel down
+Quick reference for keycodes / modifiers (SkyUI / MCM-Helper convention):
 
-Modifier mask is additive: `1` = Ctrl, `2` = Alt, `4` = Shift. So
-`Alt+WheelUp` is `keycode = 264, mods = 2`.
+- `264` = Mouse Wheel Up, `265` = Mouse Wheel Down
+- `0–255` = keyboard scan codes
+- `256–263` = mouse buttons (LMB, RMB, MMB, Mouse4–8)
+- Modifier mask: `1` Ctrl, `2` Alt, `4` Shift (add for combos — e.g. Ctrl+Alt = `3`)
+
+## Acknowledgments
+
+Cache-refresh trick adapted from
+[TES5-DynamicSpeedController](https://github.com/DanjelPiDev/TES5-DynamicSpeedController)
+(Apache-2.0). Built on
+[CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG).
+
+---
+
+# For developers
 
 ## Building from source
 
@@ -88,16 +98,13 @@ this is a Skyrim mod.
 
 ### 1. Install prerequisites
 
-- **Visual Studio 2022** (Community is fine, or Pro / Enterprise / Build
-  Tools). In the Visual Studio Installer, enable:
-  - **Desktop development with C++** workload
-  - **C++ CMake tools for Windows** individual component (gives you CMake
-    3.x and Ninja, both required by the preset)
-  - MSVC v143 toolset version **17.6 or newer** — earlier 17.x doesn't
-    have full C++23 support
+- **Visual Studio 2022** (Community is fine), with these components:
+  - Desktop development with C++
+  - C++ CMake tools for Windows (provides CMake and Ninja)
+  - MSVC v143 toolset, version **17.6 or newer** (for C++23 support)
 - **Git** for Windows ([git-scm.com](https://git-scm.com/download/win))
 
-Verify in a fresh PowerShell window:
+Verify in PowerShell:
 
 ```powershell
 git --version
@@ -105,54 +112,39 @@ git --version
     -latest -property installationPath
 ```
 
-The second command should print your VS 2022 install path. If it errors or
-returns nothing, the C++ workload isn't installed.
-
-### 2. Clone the repo
+### 2. Clone
 
 ```powershell
 git clone https://github.com/<owner>/WalkSpeedTuner.git
 cd WalkSpeedTuner
 ```
 
-### 3. Set up vcpkg
-
-vcpkg pulls in CommonLibSSE-NG (auto-fetched from the colorglass registry
-configured in `vcpkg-configuration.json`), nlohmann_json, and Catch2
-(tests only). Pick one of:
-
-**Option A — clone vcpkg next to the repo (no config needed):**
+### 3. Bootstrap vcpkg
 
 ```powershell
 git clone https://github.com/microsoft/vcpkg.git
 .\vcpkg\bootstrap-vcpkg.bat
 ```
 
-The build scripts find `.\vcpkg\vcpkg.exe` automatically. (`vcpkg/` is in
-`.gitignore`, so it won't be tracked.)
+(Or point at a system-wide vcpkg via `VCPKG_ROOT` in `.env.local` — see
+step 4.)
 
-**Option B — use a system-wide vcpkg via `VCPKG_ROOT`:** see step 4.
-
-### 4. Configure your environment (optional)
-
-Per-machine paths live in `.env.local` (gitignored). Copy the template:
+### 4. (Optional) Configure environment
 
 ```powershell
 Copy-Item .env.dist .env.local
 ```
 
-Edit `.env.local` and uncomment whichever apply. All vars are optional:
+Edit `.env.local` and uncomment whatever applies:
 
-| Variable             | Purpose                                                            |
-| -------------------- | ------------------------------------------------------------------ |
-| `VCPKG_ROOT`         | Path to a system-wide vcpkg (skip if you used Option A in step 3). |
-| `VCVARSALL`          | Override `vswhere`'s pick of `vcvarsall.bat`.                      |
-| `SKYRIM_FOLDER`      | When set at configure time, every `cmake --build` copies the DLL straight to `Data\SKSE\Plugins\`. |
-| `SKYRIM_MODS_FOLDER` | Lets `deploy.ps1` copy the staged release tree into your MO2 `mods\` directory. |
+| Variable             | Purpose                                                                  |
+| -------------------- | ------------------------------------------------------------------------ |
+| `VCPKG_ROOT`         | Path to a system-wide vcpkg (skip if you used step 3).                   |
+| `VCVARSALL`          | Override `vswhere`'s pick of `vcvarsall.bat`.                            |
+| `SKYRIM_FOLDER`      | When set, every build auto-copies the DLL to `Data\SKSE\Plugins\`.       |
+| `SKYRIM_MODS_FOLDER` | Lets `deploy.ps1` copy into your MO2 `mods\` directory.                  |
 
-`_setup-env.ps1` (dot-sourced by all build scripts) reads `.env` first,
-then `.env.local` (later overrides earlier). Variables already set in
-your shell win over both files.
+Variables set in your shell win over the file.
 
 ### 5. Build
 
@@ -160,73 +152,46 @@ your shell win over both files.
 .\build.ps1
 ```
 
-The helper discovers MSVC via `vswhere`, imports its environment into the
-current PowerShell session, and runs CMake. The DLL lands at
-`build\release\WalkSpeedTuner.dll`.
+The DLL lands at `build\release\WalkSpeedTuner.dll`.
 
-> **First build takes 10–15 minutes** while vcpkg compiles CommonLibSSE-NG
-> from source. Subsequent builds finish in seconds (binary cache).
+> First build takes 10–15 minutes while vcpkg compiles CommonLibSSE-NG
+> from source. Subsequent builds finish in seconds.
 
-If PowerShell blocks the script with an execution-policy error, run:
+If PowerShell blocks the script with an execution-policy error:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-If you prefer raw CMake, you must run from a **Developer PowerShell for
-VS 2022** (Start menu → Visual Studio 2022 folder) so that `cl.exe` is on
-PATH; the preset wires the compiler by name, not full path:
+For raw CMake, run from a **Developer PowerShell for VS 2022** so `cl.exe`
+is on PATH:
 
 ```powershell
 cmake --preset release
 cmake --build build\release
 ```
 
-### 6. Install into Skyrim
+### 6. Deploy
 
-The fastest loop is to set `SKYRIM_FOLDER` in `.env.local` (step 4) — then
-every `./build.ps1` automatically copies the DLL to
-`Data\SKSE\Plugins\WalkSpeedTuner.dll`.
-
-For Mod Organizer 2 users, set `SKYRIM_MODS_FOLDER` instead and run:
+If you set `SKYRIM_FOLDER` in step 4, every build deploys automatically.
+For MO2, set `SKYRIM_MODS_FOLDER` and run `.\deploy.ps1`. Or copy by hand:
 
 ```powershell
-.\deploy.ps1
+Copy-Item build\release\WalkSpeedTuner.dll "<skyrim>\Data\SKSE\Plugins\"
 ```
 
-This produces `<SKYRIM_MODS_FOLDER>\WalkSpeedTuner\SKSE\Plugins\WalkSpeedTuner.dll`,
-which MO2 picks up as a separate mod entry you can toggle.
-
-Or copy manually:
-
-```powershell
-Copy-Item build\release\WalkSpeedTuner.dll `
-    "<skyrim>\Data\SKSE\Plugins\"
-```
-
-## Running tests
-
-Pure-function modules (parser, gate logic, throttle, hotkey matcher,
-boost-bump) are covered by Catch2 tests with no SKSE link:
+## Tests
 
 ```powershell
 .\run-tests.ps1
 ```
 
-You should see `100% tests passed, 0 tests failed`.
+Catch2 unit tests for the pure-function modules (parser, gate logic,
+throttle, hotkey matcher, boost-bump). No SKSE link.
 
 ## Releases
 
-Tagging a commit with `v*.*.*` triggers the GitHub Actions release pipeline,
-which builds the DLL, packages it as
-`WalkSpeedTuner-vX.Y.Z.zip` (laid out as `SKSE/Plugins/WalkSpeedTuner.dll`),
-and attaches it to a GitHub Release.
-
-## Acknowledgments
-
-- Cache-defeat tickle pattern from
-  [TES5-DynamicSpeedController](https://github.com/DanjelPiDev/TES5-DynamicSpeedController).
-- [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG) for the
-  reverse-engineered Skyrim runtime bindings.
-- [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352)
-  for the dynamic MCM surface.
+Tagging a commit with `v*.*.*` triggers the GitHub Actions pipeline, which
+builds the DLL, packages it as `WalkSpeedTuner-vX.Y.Z.zip` (laid out as
+`SKSE/Plugins/WalkSpeedTuner.dll`), and attaches it to a GitHub Release
+with auto-generated notes.
