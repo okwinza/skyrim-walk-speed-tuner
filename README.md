@@ -83,46 +83,122 @@ Modifier mask is additive: `1` = Ctrl, `2` = Alt, `4` = Shift. So
 
 ## Building from source
 
-Toolchain:
-- Visual Studio 2022 with the C++23 toolset
-- CMake 3.21+ and Ninja
-- [vcpkg](https://github.com/microsoft/vcpkg) (manifest mode)
+Tested on Windows 11 with Visual Studio 2022. Linux/macOS not supported —
+this is a Skyrim mod.
 
-Set `VCPKG_ROOT` to your vcpkg checkout (or place a `vcpkg/` checkout next
-to the repo), then:
+### 1. Install prerequisites
+
+- **Visual Studio 2022** (Community is fine, or Pro / Enterprise / Build
+  Tools). In the Visual Studio Installer, enable:
+  - **Desktop development with C++** workload
+  - **C++ CMake tools for Windows** individual component (gives you CMake
+    3.x and Ninja, both required by the preset)
+  - MSVC v143 toolset version **17.6 or newer** — earlier 17.x doesn't
+    have full C++23 support
+- **Git** for Windows ([git-scm.com](https://git-scm.com/download/win))
+
+Verify in a fresh PowerShell window:
 
 ```powershell
-$env:VCPKG_ROOT = "C:\path\to\vcpkg"
+git --version
+& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+    -latest -property installationPath
+```
+
+The second command should print your VS 2022 install path. If it errors or
+returns nothing, the C++ workload isn't installed.
+
+### 2. Clone the repo
+
+```powershell
+git clone https://github.com/<owner>/WalkSpeedTuner.git
+cd WalkSpeedTuner
+```
+
+### 3. Set up vcpkg
+
+vcpkg pulls in CommonLibSSE-NG (auto-fetched from the colorglass registry
+configured in `vcpkg-configuration.json`), nlohmann_json, and Catch2
+(tests only). Pick one of:
+
+**Option A — clone vcpkg next to the repo (no env vars needed):**
+
+```powershell
+git clone https://github.com/microsoft/vcpkg.git
+.\vcpkg\bootstrap-vcpkg.bat
+```
+
+The build scripts find `.\vcpkg\vcpkg.exe` automatically. (`vcpkg/` is in
+`.gitignore`, so it won't be tracked.)
+
+**Option B — use a system-wide vcpkg via `VCPKG_ROOT`:**
+
+```powershell
+[Environment]::SetEnvironmentVariable("VCPKG_ROOT", "C:\path\to\your\vcpkg", "User")
+```
+
+Open a fresh PowerShell after setting this so the variable propagates.
+
+### 4. Build
+
+```powershell
+.\build.ps1
+```
+
+The helper discovers MSVC via `vswhere`, imports its environment into the
+current PowerShell session, and runs CMake. The DLL lands at
+`build\release\WalkSpeedTuner.dll`.
+
+> **First build takes 10–15 minutes** while vcpkg compiles CommonLibSSE-NG
+> from source. Subsequent builds finish in seconds (binary cache).
+
+If PowerShell blocks the script with an execution-policy error, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1
+```
+
+If you prefer raw CMake, you must run from a **Developer PowerShell for
+VS 2022** (Start menu → Visual Studio 2022 folder) so that `cl.exe` is on
+PATH; the preset wires the compiler by name, not full path:
+
+```powershell
 cmake --preset release
-cmake --build build/release
+cmake --build build\release
 ```
 
-Or run the helper script:
+### 5. Install into Skyrim
+
+Manual copy:
 
 ```powershell
-./build.ps1
+Copy-Item build\release\WalkSpeedTuner.dll `
+    "<skyrim>\Data\SKSE\Plugins\"
 ```
 
-The DLL lands at `build/release/WalkSpeedTuner.dll`.
-
-To stage a release tree and (optionally) deploy into an MO2 mod folder:
+…or, if you use Mod Organizer 2, build + stage + deploy in one shot:
 
 ```powershell
-$env:SKYRIM_MODS_FOLDER = "C:\path\to\MO2\mods"   # optional
-./deploy.ps1
+$env:SKYRIM_MODS_FOLDER = "C:\path\to\MO2\mods"
+.\deploy.ps1
 ```
 
-If `SKYRIM_MODS_FOLDER` is unset, `deploy.ps1` only stages the release tree
-under `release/SKSE/Plugins/`.
+This produces `<SKYRIM_MODS_FOLDER>\WalkSpeedTuner\SKSE\Plugins\WalkSpeedTuner.dll`,
+which MO2 picks up as a separate mod entry you can toggle.
 
-## Tests
+Without `SKYRIM_MODS_FOLDER`, `deploy.ps1` only stages the release tree at
+`release\SKSE\Plugins\` for you to pick up.
 
-Pure-function modules (parse, gate logic, throttle, hotkey matching, bump)
-are covered by Catch2 unit tests with no SKSE link:
+## Running tests
+
+Pure-function modules (parser, gate logic, throttle, hotkey matcher,
+boost-bump) are covered by Catch2 tests with no SKSE link:
 
 ```powershell
-./run-tests.ps1
+.\run-tests.ps1
 ```
+
+You should see `100% tests passed, 0 tests failed`.
 
 ## Releases
 
