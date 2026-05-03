@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(WalkSpeedTuner VERSION 1.0.0 LANGUAGES CXX)
+project(WalkSpeedTuner VERSION 1.2.1 LANGUAGES CXX)
 
 option(BUILD_TESTING "Build unit tests (pure-function modules only; no SKSE link)" OFF)
 
