@@ -5,7 +5,7 @@
 
 namespace WalkSpeedTuner::HookLogic {
 
-    inline constexpr float kMaxBoostPct   = 75.0f;
+    inline constexpr float kMaxBoostPct   = 110.0f;
     inline constexpr float kHotkeyStepPct = 5.0f;
 
     // Extended scan-code encoding (SkyUI/MCM-Helper convention) so mouse

@@ -21,46 +21,58 @@ namespace WalkSpeedTuner::Settings {
         WalkSpeedHook::SetEnabled(d.enabled);
         WalkSpeedHook::SetBoostPercent(d.boost_pct);
         WalkSpeedHook::SetSuppressInCombat(d.suppress_in_combat);
-        WalkSpeedHook::SetSyncAnimation(d.sync_animation);
         Hotkey::SetBoostUpKey(d.boost_up_keycode, d.boost_up_mods);
         Hotkey::SetBoostDownKey(d.boost_down_keycode, d.boost_down_mods);
 
-        spdlog::info("[Settings] applied: enabled={} boost={:.1f}% suppress={} sync={} up={} down={}",
-                     d.enabled, d.boost_pct, d.suppress_in_combat, d.sync_animation,
+        spdlog::info("[Settings] applied: enabled={} boost={:.1f}% suppress={} up={} down={}",
+                     d.enabled, d.boost_pct, d.suppress_in_combat,
                      Hotkey::ChordName(d.boost_up_keycode,   d.boost_up_mods),
                      Hotkey::ChordName(d.boost_down_keycode, d.boost_down_mods));
     }
 
-    void Save(const ConfigDocument& d) {
-        Apply(d);
+    namespace {
+        void WriteJson(const ConfigDocument& d) {
+            const auto path = FilePath();
+            const auto tmp  = std::filesystem::path(path).concat(".tmp");
+            const auto json = DocumentToJsonString(d);
 
-        const auto path = FilePath();
-        const auto tmp  = std::filesystem::path(path).concat(".tmp");
-        const auto json = DocumentToJsonString(d);
-
-        std::error_code ec;
-        std::filesystem::create_directories(path.parent_path(), ec);
-        if (ec) {
-            spdlog::warn("[Settings] mkdir failed: {}", ec.message());
-            return;
-        }
-
-        {
-            std::ofstream ofs(tmp, std::ios::binary | std::ios::trunc);
-            if (!ofs) {
-                spdlog::warn("[Settings] could not open tmp for write: {}", tmp.string());
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+            if (ec) {
+                spdlog::warn("[Settings] mkdir failed: {}", ec.message());
                 return;
             }
-            ofs << json;
-        }
 
-        std::filesystem::rename(tmp, path, ec);
-        if (ec) {
-            spdlog::warn("[Settings] atomic rename failed: {}", ec.message());
-            std::filesystem::remove(tmp, ec);
-            return;
+            {
+                std::ofstream ofs(tmp, std::ios::binary | std::ios::trunc);
+                if (!ofs) {
+                    spdlog::warn("[Settings] could not open tmp for write: {}", tmp.string());
+                    return;
+                }
+                ofs << json;
+            }
+
+            std::filesystem::rename(tmp, path, ec);
+            if (ec) {
+                spdlog::warn("[Settings] atomic rename failed: {}", ec.message());
+                std::filesystem::remove(tmp, ec);
+                return;
+            }
+            spdlog::info("[Settings] wrote {}", path.string());
         }
-        spdlog::info("[Settings] wrote {}", path.string());
+    }
+
+    void Save(const ConfigDocument& d) {
+        Apply(d);
+        WriteJson(d);
+    }
+
+    // Persist current atomic state to JSON without re-Applying. Used by
+    // the hotkey path: SetBoostPercent has already updated the atomic, so
+    // Apply'ing again would just re-call setters and emit a redundant
+    // "[Settings] applied: ..." log line per keypress.
+    void Persist() {
+        WriteJson(CurrentDocument());
     }
 
     void Load() {
@@ -89,7 +101,6 @@ namespace WalkSpeedTuner::Settings {
             WalkSpeedHook::GetEnabled(),
             WalkSpeedHook::GetBoostPercent(),
             WalkSpeedHook::GetSuppressInCombat(),
-            WalkSpeedHook::GetSyncAnimation(),
             Hotkey::GetBoostUpKey(),
             Hotkey::GetBoostUpMods(),
             Hotkey::GetBoostDownKey(),

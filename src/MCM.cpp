@@ -95,6 +95,13 @@ namespace WalkSpeedTuner::MCM {
         }
 
         void __stdcall RenderTab() {
+            // boost_pct can change externally between MCM opens (via the
+            // hotkey path). Sync from the Hook atomic each render so the
+            // slider always reflects the current truth. No watcher needed —
+            // hotkey already calls Settings::Persist(), so the JSON is fresh
+            // whenever MCM opens.
+            g_edit.boost_pct = WalkSpeedHook::GetBoostPercent();
+
             // The InputEvent callback writes captured chords directly to the
             // Hotkey atomics, not into g_edit. Re-sync each render so the
             // displayed chord updates immediately after a capture completes.
@@ -150,16 +157,8 @@ namespace WalkSpeedTuner::MCM {
                 "Example: at 30%, your SpeedMult goes from 100 to 130 while "
                 "walking, making you walk 30%% faster.\n\n"
                 "0 disables the boost without disabling the mod. Range: "
-                "0%%-75%%. Changes apply within ~25 ms (the engine cache is "
+                "0%%-110%%. Changes apply within ~25 ms (the engine cache is "
                 "tickled when you move the slider).");
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Set 25%")) {
-                g_edit.boost_pct = 25.0f;
-                changed = true;
-            }
-            WrappedTooltip(
-                "Quick preset: a comfortable middle-ground boost that makes "
-                "walking feel purposeful without crossing into jog territory.");
             ImGui::EndDisabled();
 
             // ---- Suppression ----
@@ -172,22 +171,6 @@ namespace WalkSpeedTuner::MCM {
                 "you walk at vanilla speed during fights. Default on for "
                 "hardmode-friendly behavior. Combat state uses the engine's "
                 "own flag.");
-            ImGui::EndDisabled();
-
-            // ---- Animation sync ----
-            ImGui::SeparatorText("Animation");
-            ImGui::BeginDisabled(!g_edit.enabled);
-            changed |= ImGui::Checkbox("Sync animation rate to boost",
-                                       &g_edit.sync_animation);
-            WrappedTooltip(
-                "When on, the walking animation plays faster in proportion "
-                "to your boost so the legs visibly keep pace with the body — "
-                "no skating. Costs one extra graph-variable write per frame "
-                "while boost is active.\n\n"
-                "Leave off if you don't see skating at your boost level "
-                "(small boosts under 25%% usually look fine without this). "
-                "Turn on if your feet visibly slide across the ground at "
-                "higher boosts.");
             ImGui::EndDisabled();
 
             // ---- Hotkeys ----
@@ -203,34 +186,6 @@ namespace WalkSpeedTuner::MCM {
                 "are ignored while this menu is open. ESC during capture "
                 "cancels.", HookLogic::kHotkeyStepPct);
 
-            // ---- Live status ----
-            ImGui::SeparatorText("Status");
-            const bool active = WalkSpeedHook::IsBoostActiveRightNow();
-            if (active) {
-                ImGui::TextColored(ImVec4{ 0.30f, 0.85f, 0.30f, 1.0f },
-                    "Boost active: +%.0f%% (walking)",
-                    WalkSpeedHook::GetBoostPercent());
-            } else {
-                ImGui::TextColored(ImVec4{ 0.70f, 0.70f, 0.70f, 1.0f },
-                    "Boost inactive: %s", WalkSpeedHook::InactiveReason());
-            }
-
-            // ---- About ----
-            if (ImGui::CollapsingHeader("About")) {
-                ImGui::Text("Walk Speed Tuner v1.0.0");
-                ImGui::TextDisabled("Read hook: VTABLE_PlayerCharacter[5] slot 0x01");
-                ImGui::TextDisabled("Update hook: VTABLE_PlayerCharacter[0] slot 0xAD");
-                ImGui::TextDisabled("Log: Documents\\My Games\\Skyrim Special Edition"
-                                    "\\SKSE\\WalkSpeedTuner.log");
-                ImGui::TextDisabled("Config: Data\\SKSE\\Plugins\\WalkSpeedTuner.json");
-                ImGui::Spacing();
-                ImGui::TextWrapped(
-                    "Modifies SpeedMult only while you are in walk gait. "
-                    "Never writes any persistent actor value — fully save-"
-                    "clean. If you uninstall the mod, your saves contain "
-                    "zero residue.");
-            }
-
             // ---- Danger zone ----
             ImGui::SeparatorText("Danger zone");
             if (ImGui::Button("Reset All to defaults", ImVec2(180, 0))) {
@@ -238,8 +193,8 @@ namespace WalkSpeedTuner::MCM {
             }
             WrappedTooltip(
                 "Restores all settings to defaults (boost = 0, suppress in "
-                "combat = on, animation sync = off, hotkeys cleared) and "
-                "rewrites the JSON config.\n\nNote: this mod never writes "
+                "combat = on, hotkeys reset to Alt+WheelUp / Alt+WheelDown) "
+                "and rewrites the JSON config.\n\nNote: this mod never writes "
                 "to your save — uninstalling the DLL leaves zero residue. "
                 "The Reset button is convenience only.");
             if (ConfirmModal("Confirm##reset_all",

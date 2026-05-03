@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include "Hotkey.h"
+#include "InputSuppress.h"
 #include "MCM.h"
 #include "Settings.h"
 #include "WalkSpeedHook.h"
@@ -80,6 +81,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
 
     WalkSpeedTuner::WalkSpeedHook::Install();
+    WalkSpeedTuner::InputSuppress::Install();
 
     return true;
 }

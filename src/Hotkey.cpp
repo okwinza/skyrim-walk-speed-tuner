@@ -3,6 +3,7 @@
 #include "Hotkey.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 
 #include <spdlog/spdlog.h>
@@ -10,6 +11,7 @@
 #include "SKSEMenuFramework.h"
 
 #include "HookLogic.h"
+#include "Settings.h"
 #include "WalkSpeedHook.h"
 
 namespace WalkSpeedTuner::Hotkey {
@@ -30,6 +32,18 @@ namespace WalkSpeedTuner::Hotkey {
         // Diagnostic latches — fire once each, then go silent.
         std::atomic<bool> g_first_event_logged{ false };
         std::atomic<bool> g_first_action_logged{ false };
+
+        // Debounce: the wheel callback path empirically fires twice per
+        // physical wheel tick (0–2 ms apart, see v1.2.4 log lines 12–22),
+        // so each "click" produces 2× the configured step. Real wheel ticks
+        // are ≥16 ms apart; a 10 ms window cleanly separates them.
+        std::atomic<std::int64_t> g_last_fire_ns{ 0 };
+        inline constexpr std::int64_t kFireDebounceNs = 10'000'000;  // 10 ms
+
+        inline std::int64_t NowNs() {
+            return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
 
         SKSEMenuFramework::Model::InputEvent* g_handle = nullptr;
 
@@ -209,6 +223,22 @@ namespace WalkSpeedTuner::Hotkey {
                 }
 
                 const auto match = HookLogic::MatchHotkey(encoded, mods, cfg);
+
+                // Debounce gate: ignore matches that arrive within 10 ms of
+                // the previous fire. Suppresses the wheel double-fire (2
+                // events per physical tick at 0–2 ms apart) without losing
+                // real ticks (≥16 ms apart per v1.2.4 log).
+                if (match != HookLogic::HotkeyAction::kNone) {
+                    const auto now  = NowNs();
+                    const auto last = g_last_fire_ns.load(std::memory_order_relaxed);
+                    if (now - last < kFireDebounceNs) {
+                        spdlog::debug("[Hotkey] debounced (gap {} ns < {} ns)",
+                                      now - last, kFireDebounceNs);
+                        continue;
+                    }
+                    g_last_fire_ns.store(now, std::memory_order_relaxed);
+                }
+
                 switch (match) {
                     case HookLogic::HotkeyAction::kBoostUp:
                         spdlog::info("[Hotkey] boost+ fired (encoded=0x{:X} mods=0x{:X})", encoded, mods);
@@ -216,6 +246,7 @@ namespace WalkSpeedTuner::Hotkey {
                             HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),
                                                  +HookLogic::kHotkeyStepPct,
                                                  HookLogic::kMaxBoostPct));
+                        Settings::Persist();
                         break;
                     case HookLogic::HotkeyAction::kBoostDown:
                         spdlog::info("[Hotkey] boost- fired (encoded=0x{:X} mods=0x{:X})", encoded, mods);
@@ -223,6 +254,7 @@ namespace WalkSpeedTuner::Hotkey {
                             HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),
                                                  -HookLogic::kHotkeyStepPct,
                                                  HookLogic::kMaxBoostPct));
+                        Settings::Persist();
                         break;
                     case HookLogic::HotkeyAction::kNone:
                         // Helpful diagnostic: key matches a bound chord but
@@ -335,6 +367,26 @@ namespace WalkSpeedTuner::Hotkey {
             s += buf;
         }
         return s;
+    }
+
+    bool ShouldSuppressForChord(const RE::ButtonEvent* ev) {
+        if (!ev) return false;
+        // Mouse-only: keyboard keys never trigger vanilla camera, and
+        // modifier-key chords (Ctrl/Alt/Shift) couldn't match a keyboard
+        // key whose code IS the modifier (since the modifier is held).
+        if (ev->device.get() != RE::INPUT_DEVICE::kMouse) return false;
+
+        const auto encoded = HookLogic::EncodeKeycode(
+            static_cast<int>(ev->device.get()), ev->GetIDCode());
+        const std::uint8_t mods = CurrentModMask();
+
+        const HookLogic::HotkeyConfig cfg{
+            g_up_key.load(std::memory_order_relaxed),
+            g_up_mods.load(std::memory_order_relaxed),
+            g_down_key.load(std::memory_order_relaxed),
+            g_down_mods.load(std::memory_order_relaxed),
+        };
+        return HookLogic::MatchHotkey(encoded, mods, cfg) != HookLogic::HotkeyAction::kNone;
     }
 
 }

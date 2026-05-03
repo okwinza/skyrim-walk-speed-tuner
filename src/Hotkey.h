@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+namespace RE { class ButtonEvent; }
+
 namespace WalkSpeedTuner::Hotkey {
 
     enum class Target { kNone, kBoostUp, kBoostDown };
@@ -28,5 +30,11 @@ namespace WalkSpeedTuner::Hotkey {
     void ResetModifierState();
 
     std::string ChordName(std::uint32_t code, std::uint8_t mods);
+
+    // Returns true if `ev` is a button event whose (key, mods) chord matches
+    // a currently-bound hotkey. Used by InputSuppress to gate vanilla camera
+    // zoom for wheel-bound chords. Mouse-device only — keyboard keys never
+    // trigger vanilla camera, so we don't gate them here.
+    bool ShouldSuppressForChord(const RE::ButtonEvent* ev);
 
 }

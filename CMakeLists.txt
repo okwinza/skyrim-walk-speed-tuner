@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(WalkSpeedTuner VERSION 1.2.1 LANGUAGES CXX)
+project(WalkSpeedTuner VERSION 1.4.0 LANGUAGES CXX)
 
 option(BUILD_TESTING "Build unit tests (pure-function modules only; no SKSE link)" OFF)
 
@@ -21,6 +21,7 @@ if(NOT BUILD_TESTING)
     add_commonlibsse_plugin(${PROJECT_NAME}
         SOURCES
             src/Hotkey.cpp
+            src/InputSuppress.cpp
             src/Main.cpp
             src/MCM.cpp
             src/Settings.cpp
