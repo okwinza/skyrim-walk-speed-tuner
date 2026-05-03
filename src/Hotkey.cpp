@@ -27,6 +27,10 @@ namespace WalkSpeedTuner::Hotkey {
 
         std::atomic<int> g_capturing_target{ static_cast<int>(Target::kNone) };
 
+        // Diagnostic latches — fire once each, then go silent.
+        std::atomic<bool> g_first_event_logged{ false };
+        std::atomic<bool> g_first_action_logged{ false };
+
         SKSEMenuFramework::Model::InputEvent* g_handle = nullptr;
 
         // DX scan codes for modifiers (left/right both fold into the same logical mod).
@@ -115,6 +119,12 @@ namespace WalkSpeedTuner::Hotkey {
 
         bool __stdcall Callback(RE::InputEvent* head) {
             if (!head) return false;
+
+            // One-shot lifecycle confirmation: prove the callback is firing.
+            if (!g_first_event_logged.exchange(true, std::memory_order_relaxed)) {
+                spdlog::info("[Hotkey] callback received first event — input pipeline alive");
+            }
+
             const bool mcm_open = SKSEMenuFramework::IsAnyBlockingWindowOpened();
             const auto up_k   = g_up_key.load(std::memory_order_relaxed);
             const auto down_k = g_down_key.load(std::memory_order_relaxed);
@@ -168,6 +178,9 @@ namespace WalkSpeedTuner::Hotkey {
                         continue;
                     }
 
+                    spdlog::info("[Hotkey] capture completed: target={} encoded=0x{:X} mods=0x{:X}",
+                                 target == static_cast<int>(Target::kBoostUp) ? "boost_up" : "boost_down",
+                                 encoded, mods);
                     if (target == static_cast<int>(Target::kBoostUp)) {
                         SetBoostUpKey(encoded, mods);
                     } else {
@@ -184,20 +197,45 @@ namespace WalkSpeedTuner::Hotkey {
                     up_k,   g_up_mods.load(std::memory_order_relaxed),
                     down_k, g_down_mods.load(std::memory_order_relaxed),
                 };
-                switch (HookLogic::MatchHotkey(encoded, mods, cfg)) {
+
+                // One-shot: prove that action-mode events are reaching the
+                // matcher (i.e. mcm_open isn't stuck-true and any_bound passed).
+                if (!g_first_action_logged.exchange(true, std::memory_order_relaxed)) {
+                    spdlog::info("[Hotkey] first action-mode event: encoded=0x{:X} mods=0x{:X} "
+                                 "(bound up='{}', down='{}')",
+                                 encoded, mods,
+                                 ChordName(cfg.up_key,   cfg.up_mods),
+                                 ChordName(cfg.down_key, cfg.down_mods));
+                }
+
+                const auto match = HookLogic::MatchHotkey(encoded, mods, cfg);
+                switch (match) {
                     case HookLogic::HotkeyAction::kBoostUp:
+                        spdlog::info("[Hotkey] boost+ fired (encoded=0x{:X} mods=0x{:X})", encoded, mods);
                         WalkSpeedHook::SetBoostPercent(
                             HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),
                                                  +HookLogic::kHotkeyStepPct,
                                                  HookLogic::kMaxBoostPct));
                         break;
                     case HookLogic::HotkeyAction::kBoostDown:
+                        spdlog::info("[Hotkey] boost- fired (encoded=0x{:X} mods=0x{:X})", encoded, mods);
                         WalkSpeedHook::SetBoostPercent(
                             HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),
                                                  -HookLogic::kHotkeyStepPct,
                                                  HookLogic::kMaxBoostPct));
                         break;
-                    default:
+                    case HookLogic::HotkeyAction::kNone:
+                        // Helpful diagnostic: key matches a bound chord but
+                        // modifier mask doesn't. Tells the user "you bound
+                        // Ctrl+J but you're pressing plain J" (or vice versa).
+                        if ((encoded == cfg.up_key   && cfg.up_key   != 0) ||
+                            (encoded == cfg.down_key && cfg.down_key != 0)) {
+                            spdlog::info("[Hotkey] key matches but modifier doesn't: "
+                                         "encoded=0x{:X} mods=0x{:X} (need up='{}' or down='{}')",
+                                         encoded, mods,
+                                         ChordName(cfg.up_key,   cfg.up_mods),
+                                         ChordName(cfg.down_key, cfg.down_mods));
+                        }
                         break;
                 }
             }

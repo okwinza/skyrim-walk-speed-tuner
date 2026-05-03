@@ -19,6 +19,17 @@ namespace WalkSpeedTuner::MCM {
 
         Settings::ConfigDocument g_edit{};
 
+        // Last-seen chord state, used to detect when the InputEvent callback
+        // (capture mode) wrote a new binding directly into the Hotkey atomics.
+        // MCM only triggers CommitEdit on widget changes by default; without
+        // this watcher, captured bindings live only in memory and never reach
+        // the JSON, so they're lost on game exit.
+        bool          g_chord_watcher_init = false;
+        std::uint32_t g_last_up_key    = 0;
+        std::uint8_t  g_last_up_mods   = 0;
+        std::uint32_t g_last_down_key  = 0;
+        std::uint8_t  g_last_down_mods = 0;
+
         void WrappedTooltip(const char* text) {
             if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
@@ -87,10 +98,35 @@ namespace WalkSpeedTuner::MCM {
             // The InputEvent callback writes captured chords directly to the
             // Hotkey atomics, not into g_edit. Re-sync each render so the
             // displayed chord updates immediately after a capture completes.
-            g_edit.boost_up_keycode   = Hotkey::GetBoostUpKey();
-            g_edit.boost_up_mods      = Hotkey::GetBoostUpMods();
-            g_edit.boost_down_keycode = Hotkey::GetBoostDownKey();
-            g_edit.boost_down_mods    = Hotkey::GetBoostDownMods();
+            const auto cur_up_k   = Hotkey::GetBoostUpKey();
+            const auto cur_up_m   = Hotkey::GetBoostUpMods();
+            const auto cur_down_k = Hotkey::GetBoostDownKey();
+            const auto cur_down_m = Hotkey::GetBoostDownMods();
+
+            g_edit.boost_up_keycode   = cur_up_k;
+            g_edit.boost_up_mods      = cur_up_m;
+            g_edit.boost_down_keycode = cur_down_k;
+            g_edit.boost_down_mods    = cur_down_m;
+
+            // Detect external chord change (capture-mode write from the
+            // InputEvent callback). Force CommitEdit so the new binding hits
+            // the JSON. Skip on the first render after Register so we don't
+            // spuriously commit at startup.
+            bool external_chord_change = false;
+            if (g_chord_watcher_init) {
+                external_chord_change =
+                    cur_up_k   != g_last_up_key   || cur_up_m   != g_last_up_mods ||
+                    cur_down_k != g_last_down_key || cur_down_m != g_last_down_mods;
+            }
+            g_last_up_key    = cur_up_k;
+            g_last_up_mods   = cur_up_m;
+            g_last_down_key  = cur_down_k;
+            g_last_down_mods = cur_down_m;
+            g_chord_watcher_init = true;
+
+            if (external_chord_change) {
+                spdlog::info("[MCM] hotkey chord changed externally — committing JSON");
+            }
 
             bool changed = false;
 
@@ -214,7 +250,7 @@ namespace WalkSpeedTuner::MCM {
                 g_edit = Settings::CurrentDocument();
             }
 
-            if (changed) CommitEdit();
+            if (changed || external_chord_change) CommitEdit();
         }
 
     }
