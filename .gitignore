@@ -2,9 +2,13 @@ build/
 install/
 .vs/
 .vscode/
+.idea/
 out/
 *.log
 CMakeUserPresets.json
+vcpkg/
 vcpkg_installed/
 release/
+stage/
 *.zip
+

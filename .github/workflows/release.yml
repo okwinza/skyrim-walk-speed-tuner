@@ -1,0 +1,126 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags:     ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# vcpkg + CommonLibSSE-NG via the colorglass registry.
+# Baseline pinned in vcpkg-configuration.json; we pin the vcpkg tool itself
+# below for reproducibility.
+
+env:
+  VCPKG_COMMIT: cc288af760054fa489574bd8e22d05aa8fa01e5c
+  VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
+
+jobs:
+  test:
+    name: Tests (Catch2)
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export Actions cache env
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL',     process.env.ACTIONS_CACHE_URL     || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git $env:GITHUB_WORKSPACE/vcpkg
+          Set-Location $env:GITHUB_WORKSPACE/vcpkg
+          git checkout $env:VCPKG_COMMIT
+          .\bootstrap-vcpkg.bat -disableMetrics
+          "VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Configure (tests)
+        run: cmake --preset tests
+
+      - name: Build (tests)
+        run: cmake --build build/tests
+
+      - name: Run tests
+        run: ctest --test-dir build/tests --output-on-failure
+
+  build:
+    name: Build & Package
+    runs-on: windows-2022
+    needs: test
+    timeout-minutes: 60
+    permissions:
+      contents: write   # required for softprops/action-gh-release on tag pushes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export Actions cache env
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL',     process.env.ACTIONS_CACHE_URL     || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git $env:GITHUB_WORKSPACE/vcpkg
+          Set-Location $env:GITHUB_WORKSPACE/vcpkg
+          git checkout $env:VCPKG_COMMIT
+          .\bootstrap-vcpkg.bat -disableMetrics
+          "VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Configure (release)
+        run: cmake --preset release
+
+      - name: Build (release)
+        run: cmake --build build/release
+
+      - name: Compute archive name
+        id: archive
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+              $name = "WalkSpeedTuner-${{ github.ref_name }}"
+          } else {
+              $shortSha = "${{ github.sha }}".Substring(0, 7)
+              $name = "WalkSpeedTuner-${{ github.ref_name }}-$shortSha"
+          }
+          # ref_name can contain `/` for branches like `feat/foo` — sanitize.
+          $name = $name -replace '[\\/]', '-'
+          "name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Stage release tree
+        shell: pwsh
+        run: |
+          $stage = "stage/SKSE/Plugins"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item build/release/WalkSpeedTuner.dll $stage/
+          Compress-Archive -Path stage/SKSE -DestinationPath "${{ steps.archive.outputs.name }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: ${{ steps.archive.outputs.name }}.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.archive.outputs.name }}.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
