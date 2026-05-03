@@ -1,7 +1,39 @@
 # Dot-sourced by build.ps1, deploy.ps1, run-tests.ps1.
-# Resolves MSVC vcvarsall + vcpkg, then imports MSVC env into the calling
-# PowerShell process. Honors $env:VCVARSALL and $env:VCPKG_ROOT if set;
-# otherwise discovers via vswhere and ./vcpkg/.
+#
+# Order of operations:
+#   1. Load .env then .env.local (later overrides earlier; neither overrides
+#      vars already set in the shell — shell-level env wins)
+#   2. Resolve VCVARSALL via vswhere if still unset
+#   3. Resolve VCPKG_ROOT via ./vcpkg/ if still unset
+#   4. Import MSVC environment into this process
+
+# --- Load .env files (dotenv-flow style) ---
+function Import-DotEnv {
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return }
+    foreach ($line in Get-Content $Path) {
+        $trimmed = $line.Trim()
+        if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
+        if ($trimmed -match '^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') {
+            $key = $matches[1]
+            $val = $matches[2].Trim()
+            # Strip surrounding quotes if present
+            if (($val.StartsWith('"') -and $val.EndsWith('"')) -or
+                ($val.StartsWith("'") -and $val.EndsWith("'"))) {
+                $val = $val.Substring(1, $val.Length - 2)
+            }
+            # Don't override vars already set in the shell (matches dotenv
+            # standard — shell env wins).
+            if (-not [System.Environment]::GetEnvironmentVariable($key, 'Process')) {
+                [System.Environment]::SetEnvironmentVariable($key, $val, 'Process')
+            }
+        }
+    }
+}
+
+# Import in cascade order: .env first (so .env.local overrides it).
+Import-DotEnv (Join-Path $PSScriptRoot ".env")
+Import-DotEnv (Join-Path $PSScriptRoot ".env.local")
 
 # --- Locate vcvarsall ---
 if (-not $env:VCVARSALL -or -not (Test-Path $env:VCVARSALL)) {
@@ -18,7 +50,7 @@ if (-not $env:VCVARSALL -or -not (Test-Path $env:VCVARSALL)) {
 }
 if (-not $env:VCVARSALL -or -not (Test-Path $env:VCVARSALL)) {
     Write-Host "vcvarsall.bat not found." -ForegroundColor Red
-    Write-Host "  Install MSVC C++ tools, or set \$env:VCVARSALL to the vcvarsall.bat path." -ForegroundColor Yellow
+    Write-Host "  Install MSVC C++ tools, or set VCVARSALL in .env.local." -ForegroundColor Yellow
     exit 1
 }
 
@@ -31,8 +63,8 @@ if (-not $env:VCPKG_ROOT) {
 }
 if (-not $env:VCPKG_ROOT -or -not (Test-Path $env:VCPKG_ROOT)) {
     Write-Host "vcpkg not found." -ForegroundColor Red
-    Write-Host "  Either: \$env:VCPKG_ROOT = 'C:\path\to\vcpkg'" -ForegroundColor Yellow
-    Write-Host "  Or: git clone https://github.com/microsoft/vcpkg.git ./vcpkg; ./vcpkg/bootstrap-vcpkg.bat" -ForegroundColor Yellow
+    Write-Host "  Either: set VCPKG_ROOT in .env.local" -ForegroundColor Yellow
+    Write-Host "  Or:     git clone https://github.com/microsoft/vcpkg.git ./vcpkg; ./vcpkg/bootstrap-vcpkg.bat" -ForegroundColor Yellow
     exit 1
 }
 

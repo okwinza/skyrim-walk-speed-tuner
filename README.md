@@ -121,7 +121,7 @@ vcpkg pulls in CommonLibSSE-NG (auto-fetched from the colorglass registry
 configured in `vcpkg-configuration.json`), nlohmann_json, and Catch2
 (tests only). Pick one of:
 
-**Option A — clone vcpkg next to the repo (no env vars needed):**
+**Option A — clone vcpkg next to the repo (no config needed):**
 
 ```powershell
 git clone https://github.com/microsoft/vcpkg.git
@@ -131,15 +131,30 @@ git clone https://github.com/microsoft/vcpkg.git
 The build scripts find `.\vcpkg\vcpkg.exe` automatically. (`vcpkg/` is in
 `.gitignore`, so it won't be tracked.)
 
-**Option B — use a system-wide vcpkg via `VCPKG_ROOT`:**
+**Option B — use a system-wide vcpkg via `VCPKG_ROOT`:** see step 4.
+
+### 4. Configure your environment (optional)
+
+Per-machine paths live in `.env.local` (gitignored). Copy the template:
 
 ```powershell
-[Environment]::SetEnvironmentVariable("VCPKG_ROOT", "C:\path\to\your\vcpkg", "User")
+Copy-Item .env.dist .env.local
 ```
 
-Open a fresh PowerShell after setting this so the variable propagates.
+Edit `.env.local` and uncomment whichever apply. All vars are optional:
 
-### 4. Build
+| Variable             | Purpose                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `VCPKG_ROOT`         | Path to a system-wide vcpkg (skip if you used Option A in step 3). |
+| `VCVARSALL`          | Override `vswhere`'s pick of `vcvarsall.bat`.                      |
+| `SKYRIM_FOLDER`      | When set at configure time, every `cmake --build` copies the DLL straight to `Data\SKSE\Plugins\`. |
+| `SKYRIM_MODS_FOLDER` | Lets `deploy.ps1` copy the staged release tree into your MO2 `mods\` directory. |
+
+`_setup-env.ps1` (dot-sourced by all build scripts) reads `.env` first,
+then `.env.local` (later overrides earlier). Variables already set in
+your shell win over both files.
+
+### 5. Build
 
 ```powershell
 .\build.ps1
@@ -167,27 +182,27 @@ cmake --preset release
 cmake --build build\release
 ```
 
-### 5. Install into Skyrim
+### 6. Install into Skyrim
 
-Manual copy:
+The fastest loop is to set `SKYRIM_FOLDER` in `.env.local` (step 4) — then
+every `./build.ps1` automatically copies the DLL to
+`Data\SKSE\Plugins\WalkSpeedTuner.dll`.
 
-```powershell
-Copy-Item build\release\WalkSpeedTuner.dll `
-    "<skyrim>\Data\SKSE\Plugins\"
-```
-
-…or, if you use Mod Organizer 2, build + stage + deploy in one shot:
+For Mod Organizer 2 users, set `SKYRIM_MODS_FOLDER` instead and run:
 
 ```powershell
-$env:SKYRIM_MODS_FOLDER = "C:\path\to\MO2\mods"
 .\deploy.ps1
 ```
 
 This produces `<SKYRIM_MODS_FOLDER>\WalkSpeedTuner\SKSE\Plugins\WalkSpeedTuner.dll`,
 which MO2 picks up as a separate mod entry you can toggle.
 
-Without `SKYRIM_MODS_FOLDER`, `deploy.ps1` only stages the release tree at
-`release\SKSE\Plugins\` for you to pick up.
+Or copy manually:
+
+```powershell
+Copy-Item build\release\WalkSpeedTuner.dll `
+    "<skyrim>\Data\SKSE\Plugins\"
+```
 
 ## Running tests
 

@@ -5,6 +5,8 @@ install/
 .idea/
 out/
 *.log
+.env
+.env.local
 CMakeUserPresets.json
 vcpkg/
 vcpkg_installed/
