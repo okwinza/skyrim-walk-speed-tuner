@@ -157,7 +157,7 @@ namespace WalkSpeedTuner::MCM {
                 "Example: at 30%, your SpeedMult goes from 100 to 130 while "
                 "walking, making you walk 30%% faster.\n\n"
                 "0 disables the boost without disabling the mod. Range: "
-                "0%%-110%%. Changes apply within ~25 ms (the engine cache is "
+                "0%%-120%%. Changes apply within ~25 ms (the engine cache is "
                 "tickled when you move the slider).");
             ImGui::EndDisabled();
 

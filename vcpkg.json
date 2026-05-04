@@ -1,7 +1,7 @@
 {
     "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
     "name": "walk-speed-tuner",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "default-features": [ "plugin" ],
     "features": {
         "plugin": {

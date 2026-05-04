@@ -1,7 +1,7 @@
 # Walk Speed Tuner
 
 A small SKSE plugin that lets you walk faster in Skyrim SE/AE. Adds a
-configurable boost (0–110%) to your walk speed only — sprint, run, sneak,
+configurable boost (0–120%) to your walk speed only — sprint, run, sneak,
 and NPCs are untouched.
 
 **Save-clean.** The plugin never writes to your character's actor values.
@@ -11,7 +11,7 @@ script residue.
 
 ## Features
 
-- 0–110% walk-speed boost (default: off)
+- 0–120% walk-speed boost (default: off)
 - **Alt + Mouse Wheel Up / Down** to bump boost ±5% on the fly
 - Optional: vanilla speed during combat (default on)
 - In-game settings panel (with [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352))
@@ -39,7 +39,7 @@ Download the latest `WalkSpeedTuner-vX.Y.Z.zip` from the
 1. Toggle walk gait — Caps Lock by default, or whatever you bound to
    "Always Walk".
 2. Hold **Alt** and scroll the mouse wheel — up to walk faster, down to
-   slow down. Each click changes boost by 5%, up to a maximum of 110%.
+   slow down. Each click changes boost by 5%, up to a maximum of 120%.
 
 The boost only applies while you're walking. Sprint, run, and sneak speeds
 are unchanged.
@@ -52,7 +52,7 @@ are unchanged.
 | Setting                | What it does                                                          |
 | ---------------------- | --------------------------------------------------------------------- |
 | Enable                 | Master toggle. Off = vanilla speed.                                   |
-| Boost (%)              | 0 to 110.                                                             |
+| Boost (%)              | 0 to 120.                                                             |
 | Suppress during combat | Revert to vanilla speed during fights.                                |
 | Hotkeys                | Rebind Boost+ / Boost-. Click *Set*, press a key (or modifier+key). ESC cancels. |
 | Reset All              | Restore defaults (boost 0, hotkeys Alt+Wheel).                        |

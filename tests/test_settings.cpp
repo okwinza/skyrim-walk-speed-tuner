@@ -31,12 +31,12 @@ TEST_CASE("empty string returns defaults", "[settings]") {
 
 TEST_CASE("clamps boost_pct above max", "[settings]") {
     auto d = ParseDocumentFromJson(R"({"boost_pct": 999.0})");
-    REQUIRE(d.boost_pct == 110.0f);
+    REQUIRE(d.boost_pct == 120.0f);
 }
 
 TEST_CASE("accepts boost_pct exactly at max", "[settings]") {
-    auto d = ParseDocumentFromJson(R"({"boost_pct": 110.0})");
-    REQUIRE(d.boost_pct == 110.0f);
+    auto d = ParseDocumentFromJson(R"({"boost_pct": 120.0})");
+    REQUIRE(d.boost_pct == 120.0f);
 }
 
 TEST_CASE("clamps boost_pct below 0", "[settings]") {
