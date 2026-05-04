@@ -1,0 +1,11 @@
+// Auto-generated from cmake/plugin.cpp.in by configure_file. Do not edit.
+// SKSEPluginInfo expands to both SKSEPlugin_Version (constinit global) and
+// SKSEPlugin_Query (entrypoint SKSE calls during compat negotiation).
+
+#include <SKSE/SKSE.h>
+
+SKSEPluginInfo(
+    .Version = { @PROJECT_VERSION_MAJOR@, @PROJECT_VERSION_MINOR@, @PROJECT_VERSION_PATCH@, 0 },
+    .Name    = "@PROJECT_NAME@",
+    .Author  = "okwinza"
+)

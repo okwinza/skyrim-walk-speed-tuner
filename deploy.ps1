@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-$buildDll          = Join-Path $PSScriptRoot "build\release\WalkSpeedTuner.dll"
+$buildDll          = Join-Path $PSScriptRoot "build\release\bin\WalkSpeedTuner.dll"
 $releaseTree       = Join-Path $PSScriptRoot "release\SKSE"
 $releasePluginsDir = Join-Path $releaseTree "Plugins"
 $releaseDll        = Join-Path $releasePluginsDir "WalkSpeedTuner.dll"

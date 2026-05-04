@@ -8,14 +8,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# vcpkg + CommonLibSSE-NG via the colorglass registry. Baseline pinned in
-# vcpkg-configuration.json; we pin the vcpkg tool itself below for repro.
-# Builds are uncached for now — first build compiles CommonLibSSE-NG
-# from source (~10–15 min). actions/cache for vcpkg/installed/buildtrees
-# can be added later if we want to speed this up.
+# CommonLibSSE-NG is consumed as a git submodule (see extern/CommonLibSSE-NG).
+# vcpkg pulls in the transitive deps it needs (spdlog, directxtk, etc.) via
+# our vcpkg.json "plugin" feature. Public registry only — no custom registry.
 
 env:
-  VCPKG_COMMIT: cc288af760054fa489574bd8e22d05aa8fa01e5c
+  # vcpkg-tool commit. Match our vcpkg.json builtin-baseline so the tool
+  # version aligns with the package versions our manifest expects.
+  VCPKG_COMMIT: ee12231b20c95013c6638d845d04c91559a1d1ff
 
 jobs:
   test:
@@ -55,9 +55,11 @@ jobs:
     needs: test
     timeout-minutes: 60
     permissions:
-      contents: write   # required for softprops/action-gh-release on tag pushes
+      contents: write   # softprops/action-gh-release on tag pushes
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -73,6 +75,16 @@ jobs:
           git checkout $env:VCPKG_COMMIT
           .\bootstrap-vcpkg.bat -disableMetrics
           "VCPKG_ROOT=$env:GITHUB_WORKSPACE/vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # Cache the build directory keyed on the submodule SHA + cmake config
+      # files. Saves ~10 min of CommonLibSSE-NG recompilation on cache hit.
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build/release
+          key: build-release-${{ runner.os }}-${{ hashFiles('extern/CommonLibSSE-NG/**/*.cmake', 'extern/CommonLibSSE-NG/**/CMakeLists.txt', 'CMakeLists.txt', 'CMakePresets.json', 'cmake/**', 'vcpkg.json') }}-${{ hashFiles('.gitmodules') }}
+          restore-keys: |
+            build-release-${{ runner.os }}-
 
       - name: Configure (release)
         run: cmake --preset release
@@ -90,7 +102,6 @@ jobs:
               $shortSha = "${{ github.sha }}".Substring(0, 7)
               $name = "WalkSpeedTuner-${{ github.ref_name }}-$shortSha"
           }
-          # ref_name can contain `/` for branches like `feat/foo` — sanitize.
           $name = $name -replace '[\\/]', '-'
           "name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
@@ -99,7 +110,7 @@ jobs:
         run: |
           $stage = "stage/SKSE/Plugins"
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
-          Copy-Item build/release/WalkSpeedTuner.dll $stage/
+          Copy-Item build/release/bin/WalkSpeedTuner.dll $stage/
           Compress-Archive -Path stage/SKSE -DestinationPath "${{ steps.archive.outputs.name }}.zip"
 
       - uses: actions/upload-artifact@v4

@@ -80,8 +80,9 @@ namespace WalkSpeedTuner::WalkSpeedHook {
 
             if (auto* avo = actor->AsActorValueOwner()) {
                 constexpr float eps = 0.10f;  // DSC kRefreshEps
-                avo->ModActorValue(RE::ActorValue::kCarryWeight, +eps);
-                avo->ModActorValue(RE::ActorValue::kCarryWeight, -eps);
+                using Mod = RE::ACTOR_VALUE_MODIFIER;
+                avo->ModActorValue(Mod::kDamage, RE::ActorValue::kCarryWeight, +eps);
+                avo->ModActorValue(Mod::kDamage, RE::ActorValue::kCarryWeight, -eps);
             }
         }
 

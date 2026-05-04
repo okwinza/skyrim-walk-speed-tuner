@@ -112,14 +112,21 @@ git --version
     -latest -property installationPath
 ```
 
-### 2. Clone
+### 2. Clone (with submodules)
 
 ```powershell
-git clone https://github.com/<owner>/WalkSpeedTuner.git
+git clone --recursive https://github.com/okwinza/skyrim-walk-speed-tuner.git WalkSpeedTuner
 cd WalkSpeedTuner
 ```
 
+`--recursive` pulls [CommonLibSSE-NG](https://github.com/alandtse/CommonLibVR/tree/ng)
+under `extern/`. Forgot the flag? Run `git submodule update --init --recursive`.
+`build.ps1` will also auto-init the submodule if it's missing.
+
 ### 3. Bootstrap vcpkg
+
+vcpkg handles transitive deps (spdlog, DirectXTK, rapidcsv, fmt, nlohmann-json,
+catch2). CommonLibSSE-NG is the submodule, not a vcpkg package.
 
 ```powershell
 git clone https://github.com/microsoft/vcpkg.git
