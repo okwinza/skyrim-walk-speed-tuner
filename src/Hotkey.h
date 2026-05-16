@@ -7,7 +7,7 @@ namespace RE { class ButtonEvent; }
 
 namespace WalkSpeedTuner::Hotkey {
 
-    enum class Target { kNone, kBoostUp, kBoostDown };
+    enum class Target { kNone, kBoostUp, kBoostDown, kReset };
 
     constexpr std::uint8_t kModCtrl  = 1 << 0;
     constexpr std::uint8_t kModAlt   = 1 << 1;
@@ -22,10 +22,13 @@ namespace WalkSpeedTuner::Hotkey {
 
     void          SetBoostUpKey(std::uint32_t code, std::uint8_t mods);
     void          SetBoostDownKey(std::uint32_t code, std::uint8_t mods);
+    void          SetResetKey(std::uint32_t code, std::uint8_t mods);
     std::uint32_t GetBoostUpKey();
     std::uint8_t  GetBoostUpMods();
     std::uint32_t GetBoostDownKey();
     std::uint8_t  GetBoostDownMods();
+    std::uint32_t GetResetKey();
+    std::uint8_t  GetResetMods();
 
     void ResetModifierState();
 

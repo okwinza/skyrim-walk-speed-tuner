@@ -3,7 +3,6 @@
 #include "WalkSpeedHook.h"
 
 #include <atomic>
-#include <chrono>
 
 #include <spdlog/spdlog.h>
 
@@ -19,6 +18,8 @@ namespace WalkSpeedTuner::WalkSpeedHook {
         std::atomic<bool>    g_enabled{ true };
         std::atomic<float>   g_boost_pct{ 0.0f };
         std::atomic<bool>    g_suppress_in_combat{ true };
+        std::atomic<float>   g_min_limit{ -20.0f };
+        std::atomic<float>   g_max_limit{ 140.0f };
         std::atomic<bool>    g_first_boost_logged{ false };
         // ns-since-steady-epoch. std::atomic<steady_clock::time_point> isn't
         // guaranteed lock-free on MSVC; int64 is.
@@ -29,11 +30,6 @@ namespace WalkSpeedTuner::WalkSpeedHook {
         using GetActorValue_t = float (*)(RE::ActorValueOwner*, RE::ActorValue);
         REL::Relocation<GetActorValue_t> g_orig_GetActorValue;
 
-        inline std::int64_t NowNs() {
-            return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count();
-        }
-
         float HookGetActorValue(RE::ActorValueOwner* self, RE::ActorValue av) {
             // Tail-call form for the 99% non-SpeedMult path — lets the
             // compiler emit a jmp instead of call+ret.
@@ -42,11 +38,12 @@ namespace WalkSpeedTuner::WalkSpeedHook {
             const float base = g_orig_GetActorValue(self, av);
 
             // Two early-returns: from this point forward we know `enabled`
-            // is true and `boost_pct > 0`, so the inlined BoostInputs sets
-            // `enabled = true` unconditionally (the remaining gate work in
-            // IsBoostActive is the walking + combat checks).
+            // is true and `boost_pct != 0` (it may be negative — a walk-speed
+            // reduction), so the inlined BoostInputs sets `enabled = true`
+            // unconditionally (the remaining gate work in IsBoostActive is the
+            // walking + combat checks).
             if (!g_enabled.load(std::memory_order_relaxed)) return base;
-            if (g_boost_pct.load(std::memory_order_relaxed) <= 0.0f) return base;
+            if (g_boost_pct.load(std::memory_order_relaxed) == 0.0f) return base;
 
             auto* player = RE::PlayerCharacter::GetSingleton();
             if (!player) return base;
@@ -72,7 +69,7 @@ namespace WalkSpeedTuner::WalkSpeedHook {
 
         void ForceSpeedRefresh(RE::Actor* actor) {
             if (!actor) return;
-            const auto now  = NowNs();
+            const auto now  = HookLogic::NowNs();
             const auto last = g_last_tickle_ns.load(std::memory_order_relaxed);
             constexpr std::int64_t kThrottleNs = 25 * 1'000'000;  // 25 ms — DSC's value
             if (!HookLogic::ShouldTickle(now, last, kThrottleNs)) return;
@@ -101,7 +98,9 @@ namespace WalkSpeedTuner::WalkSpeedHook {
     }
 
     void SetBoostPercent(float pct) {
-        const float clamped = std::clamp(pct, 0.0f, HookLogic::kMaxBoostPct);
+        const float clamped = std::clamp(pct,
+                                         g_min_limit.load(std::memory_order_relaxed),
+                                         g_max_limit.load(std::memory_order_relaxed));
         const float prev = g_boost_pct.exchange(clamped, std::memory_order_relaxed);
         if (std::abs(prev - clamped) <= 0.001f) return;
         spdlog::info("[Hook] boost {:.1f} -> {:.1f}; tickling", prev, clamped);
@@ -117,6 +116,17 @@ namespace WalkSpeedTuner::WalkSpeedHook {
         if (prev != suppress) {
             spdlog::info("[Hook] suppress_in_combat {} -> {}", prev, suppress);
         }
+    }
+
+    void SetLimits(float lower, float upper) {
+        const float prev_lo = g_min_limit.exchange(lower, std::memory_order_relaxed);
+        const float prev_hi = g_max_limit.exchange(upper, std::memory_order_relaxed);
+        if (std::abs(prev_lo - lower) > 0.001f || std::abs(prev_hi - upper) > 0.001f) {
+            spdlog::info("[Hook] limits {:.0f}..{:.0f} -> {:.0f}..{:.0f}",
+                         prev_lo, prev_hi, lower, upper);
+        }
+        // The caller (Settings::Apply) re-applies boost_pct right after, which
+        // re-clamps it through SetBoostPercent against these new bounds.
     }
 
     void SetEnabled(bool enabled) {
@@ -138,5 +148,7 @@ namespace WalkSpeedTuner::WalkSpeedHook {
     bool  GetEnabled()           { return g_enabled.load(std::memory_order_relaxed); }
     float GetBoostPercent()      { return g_boost_pct.load(std::memory_order_relaxed); }
     bool  GetSuppressInCombat()  { return g_suppress_in_combat.load(std::memory_order_relaxed); }
+    float GetMinLimit()          { return g_min_limit.load(std::memory_order_relaxed); }
+    float GetMaxLimit()          { return g_max_limit.load(std::memory_order_relaxed); }
 
 }

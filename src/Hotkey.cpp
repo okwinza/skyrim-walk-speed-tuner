@@ -3,7 +3,6 @@
 #include "Hotkey.h"
 
 #include <atomic>
-#include <chrono>
 #include <cstdio>
 
 #include <spdlog/spdlog.h>
@@ -11,6 +10,7 @@
 #include "SKSEMenuFramework.h"
 
 #include "HookLogic.h"
+#include "Indicator.h"
 #include "Settings.h"
 #include "WalkSpeedHook.h"
 
@@ -20,8 +20,10 @@ namespace WalkSpeedTuner::Hotkey {
 
         std::atomic<std::uint32_t> g_up_key{ 0 };
         std::atomic<std::uint32_t> g_down_key{ 0 };
+        std::atomic<std::uint32_t> g_reset_key{ 0 };
         std::atomic<std::uint8_t>  g_up_mods{ 0 };
         std::atomic<std::uint8_t>  g_down_mods{ 0 };
+        std::atomic<std::uint8_t>  g_reset_mods{ 0 };
 
         std::atomic<bool> g_ctrl_down{ false };
         std::atomic<bool> g_alt_down{ false };
@@ -39,11 +41,6 @@ namespace WalkSpeedTuner::Hotkey {
         // are ≥16 ms apart; a 10 ms window cleanly separates them.
         std::atomic<std::int64_t> g_last_fire_ns{ 0 };
         inline constexpr std::int64_t kFireDebounceNs = 10'000'000;  // 10 ms
-
-        inline std::int64_t NowNs() {
-            return std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count();
-        }
 
         SKSEMenuFramework::Model::InputEvent* g_handle = nullptr;
 
@@ -121,13 +118,28 @@ namespace WalkSpeedTuner::Hotkey {
             }
         }
 
-        void WarnOnCollision(std::uint32_t new_key, std::uint8_t new_mods,
-                             std::uint32_t other_key, std::uint8_t other_mods,
-                             const char* this_label) {
-            if (new_key != 0 && new_key == other_key && new_mods == other_mods) {
-                spdlog::warn("[Hotkey] WARN boost_up and boost_down bound to same chord '{}' — "
-                             "only boost_up will fire (set on {})",
-                             ChordName(new_key, new_mods), this_label);
+        // Logs any pair of the three hotkeys bound to the same chord. The
+        // matcher checks up, then down, then reset, so on a clash the
+        // earlier-listed action wins and the later one goes dead.
+        void LogChordCollisions() {
+            struct Bind { std::uint32_t key; std::uint8_t mods; const char* label; };
+            const Bind binds[] = {
+                { g_up_key.load(std::memory_order_relaxed),
+                  g_up_mods.load(std::memory_order_relaxed),    "boost_up" },
+                { g_down_key.load(std::memory_order_relaxed),
+                  g_down_mods.load(std::memory_order_relaxed),  "boost_down" },
+                { g_reset_key.load(std::memory_order_relaxed),
+                  g_reset_mods.load(std::memory_order_relaxed), "reset" },
+            };
+            for (int i = 0; i < 3; ++i) {
+                for (int k = i + 1; k < 3; ++k) {
+                    if (binds[i].key != 0 &&
+                        binds[i].key == binds[k].key && binds[i].mods == binds[k].mods) {
+                        spdlog::warn("[Hotkey] WARN {} and {} share chord '{}' — only {} fires",
+                                     binds[i].label, binds[k].label,
+                                     ChordName(binds[i].key, binds[i].mods), binds[i].label);
+                    }
+                }
             }
         }
 
@@ -140,9 +152,10 @@ namespace WalkSpeedTuner::Hotkey {
             }
 
             const bool mcm_open = SKSEMenuFramework::IsAnyBlockingWindowOpened();
-            const auto up_k   = g_up_key.load(std::memory_order_relaxed);
-            const auto down_k = g_down_key.load(std::memory_order_relaxed);
-            const bool any_bound = (up_k != 0) || (down_k != 0);
+            const auto up_k    = g_up_key.load(std::memory_order_relaxed);
+            const auto down_k  = g_down_key.load(std::memory_order_relaxed);
+            const auto reset_k = g_reset_key.load(std::memory_order_relaxed);
+            const bool any_bound = (up_k != 0) || (down_k != 0) || (reset_k != 0);
 
             for (auto* ev = head; ev; ev = ev->next) {
                 auto* btn = ev->AsButtonEvent();
@@ -192,13 +205,17 @@ namespace WalkSpeedTuner::Hotkey {
                         continue;
                     }
 
+                    const char* tname =
+                        target == static_cast<int>(Target::kBoostUp)   ? "boost_up"   :
+                        target == static_cast<int>(Target::kBoostDown) ? "boost_down" : "reset";
                     spdlog::info("[Hotkey] capture completed: target={} encoded=0x{:X} mods=0x{:X}",
-                                 target == static_cast<int>(Target::kBoostUp) ? "boost_up" : "boost_down",
-                                 encoded, mods);
+                                 tname, encoded, mods);
                     if (target == static_cast<int>(Target::kBoostUp)) {
                         SetBoostUpKey(encoded, mods);
-                    } else {
+                    } else if (target == static_cast<int>(Target::kBoostDown)) {
                         SetBoostDownKey(encoded, mods);
+                    } else {
+                        SetResetKey(encoded, mods);
                     }
                     g_capturing_target.store(static_cast<int>(Target::kNone),
                                              std::memory_order_relaxed);
@@ -208,18 +225,20 @@ namespace WalkSpeedTuner::Hotkey {
                 if (!any_bound) continue;
 
                 const HookLogic::HotkeyConfig cfg{
-                    up_k,   g_up_mods.load(std::memory_order_relaxed),
-                    down_k, g_down_mods.load(std::memory_order_relaxed),
+                    up_k,    g_up_mods.load(std::memory_order_relaxed),
+                    down_k,  g_down_mods.load(std::memory_order_relaxed),
+                    reset_k, g_reset_mods.load(std::memory_order_relaxed),
                 };
 
                 // One-shot: prove that action-mode events are reaching the
                 // matcher (i.e. mcm_open isn't stuck-true and any_bound passed).
                 if (!g_first_action_logged.exchange(true, std::memory_order_relaxed)) {
                     spdlog::info("[Hotkey] first action-mode event: encoded=0x{:X} mods=0x{:X} "
-                                 "(bound up='{}', down='{}')",
+                                 "(bound up='{}', down='{}', reset='{}')",
                                  encoded, mods,
-                                 ChordName(cfg.up_key,   cfg.up_mods),
-                                 ChordName(cfg.down_key, cfg.down_mods));
+                                 ChordName(cfg.up_key,    cfg.up_mods),
+                                 ChordName(cfg.down_key,  cfg.down_mods),
+                                 ChordName(cfg.reset_key, cfg.reset_mods));
                 }
 
                 const auto match = HookLogic::MatchHotkey(encoded, mods, cfg);
@@ -229,7 +248,7 @@ namespace WalkSpeedTuner::Hotkey {
                 // events per physical tick at 0–2 ms apart) without losing
                 // real ticks (≥16 ms apart per v1.2.4 log).
                 if (match != HookLogic::HotkeyAction::kNone) {
-                    const auto now  = NowNs();
+                    const auto now  = HookLogic::NowNs();
                     const auto last = g_last_fire_ns.load(std::memory_order_relaxed);
                     if (now - last < kFireDebounceNs) {
                         spdlog::debug("[Hotkey] debounced (gap {} ns < {} ns)",
@@ -239,34 +258,46 @@ namespace WalkSpeedTuner::Hotkey {
                     g_last_fire_ns.store(now, std::memory_order_relaxed);
                 }
 
+                // Every action ends the same way — set the boost, persist it,
+                // pop the indicator. boost+/- commit a bumped value; reset
+                // commits 0.
+                const auto commit_boost = [&](float value, const char* label) {
+                    spdlog::info("[Hotkey] {} fired (encoded=0x{:X} mods=0x{:X})",
+                                 label, encoded, mods);
+                    WalkSpeedHook::SetBoostPercent(value);
+                    Settings::Persist();
+                    Indicator::Ping();
+                };
+                const auto bumped = [](float step) {
+                    return HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(), step,
+                                                WalkSpeedHook::GetMinLimit(),
+                                                WalkSpeedHook::GetMaxLimit());
+                };
+
                 switch (match) {
                     case HookLogic::HotkeyAction::kBoostUp:
-                        spdlog::info("[Hotkey] boost+ fired (encoded=0x{:X} mods=0x{:X})", encoded, mods);
-                        WalkSpeedHook::SetBoostPercent(
-                            HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),
-                                                 +HookLogic::kHotkeyStepPct,
-                                                 HookLogic::kMaxBoostPct));
-                        Settings::Persist();
+                        commit_boost(bumped(+HookLogic::kHotkeyStepPct), "boost+");
                         break;
                     case HookLogic::HotkeyAction::kBoostDown:
-                        spdlog::info("[Hotkey] boost- fired (encoded=0x{:X} mods=0x{:X})", encoded, mods);
-                        WalkSpeedHook::SetBoostPercent(
-                            HookLogic::BumpBoost(WalkSpeedHook::GetBoostPercent(),
-                                                 -HookLogic::kHotkeyStepPct,
-                                                 HookLogic::kMaxBoostPct));
-                        Settings::Persist();
+                        commit_boost(bumped(-HookLogic::kHotkeyStepPct), "boost-");
+                        break;
+                    case HookLogic::HotkeyAction::kReset:
+                        commit_boost(0.0f, "reset");
                         break;
                     case HookLogic::HotkeyAction::kNone:
                         // Helpful diagnostic: key matches a bound chord but
                         // modifier mask doesn't. Tells the user "you bound
                         // Ctrl+J but you're pressing plain J" (or vice versa).
-                        if ((encoded == cfg.up_key   && cfg.up_key   != 0) ||
-                            (encoded == cfg.down_key && cfg.down_key != 0)) {
+                        if ((encoded == cfg.up_key    && cfg.up_key    != 0) ||
+                            (encoded == cfg.down_key  && cfg.down_key  != 0) ||
+                            (encoded == cfg.reset_key && cfg.reset_key != 0)) {
                             spdlog::info("[Hotkey] key matches but modifier doesn't: "
-                                         "encoded=0x{:X} mods=0x{:X} (need up='{}' or down='{}')",
+                                         "encoded=0x{:X} mods=0x{:X} "
+                                         "(need up='{}', down='{}' or reset='{}')",
                                          encoded, mods,
-                                         ChordName(cfg.up_key,   cfg.up_mods),
-                                         ChordName(cfg.down_key, cfg.down_mods));
+                                         ChordName(cfg.up_key,    cfg.up_mods),
+                                         ChordName(cfg.down_key,  cfg.down_mods),
+                                         ChordName(cfg.reset_key, cfg.reset_mods));
                         }
                         break;
                 }
@@ -292,8 +323,9 @@ namespace WalkSpeedTuner::Hotkey {
     void BeginCapture(Target t) {
         g_capturing_target.store(static_cast<int>(t), std::memory_order_relaxed);
         spdlog::info("[Hotkey] capture started for {}",
-                     t == Target::kBoostUp ? "boost_up" :
-                     t == Target::kBoostDown ? "boost_down" : "none");
+                     t == Target::kBoostUp   ? "boost_up"   :
+                     t == Target::kBoostDown ? "boost_down" :
+                     t == Target::kReset     ? "reset"      : "none");
     }
 
     void CancelCapture() {
@@ -318,10 +350,7 @@ namespace WalkSpeedTuner::Hotkey {
         } else {
             spdlog::info("[Hotkey] bound boost_up to '{}' (key=0x{:X} mods=0x{:X})",
                          ChordName(code, mods), code, mods);
-            WarnOnCollision(code, mods,
-                            g_down_key.load(std::memory_order_relaxed),
-                            g_down_mods.load(std::memory_order_relaxed),
-                            "boost_up");
+            LogChordCollisions();
         }
     }
 
@@ -335,10 +364,21 @@ namespace WalkSpeedTuner::Hotkey {
         } else {
             spdlog::info("[Hotkey] bound boost_down to '{}' (key=0x{:X} mods=0x{:X})",
                          ChordName(code, mods), code, mods);
-            WarnOnCollision(code, mods,
-                            g_up_key.load(std::memory_order_relaxed),
-                            g_up_mods.load(std::memory_order_relaxed),
-                            "boost_down");
+            LogChordCollisions();
+        }
+    }
+
+    void SetResetKey(std::uint32_t code, std::uint8_t mods) {
+        const auto prev_k = g_reset_key.exchange(code, std::memory_order_relaxed);
+        const auto prev_m = g_reset_mods.exchange(mods, std::memory_order_relaxed);
+        if (prev_k == code && prev_m == mods) return;
+
+        if (code == 0) {
+            spdlog::info("[Hotkey] cleared reset");
+        } else {
+            spdlog::info("[Hotkey] bound reset to '{}' (key=0x{:X} mods=0x{:X})",
+                         ChordName(code, mods), code, mods);
+            LogChordCollisions();
         }
     }
 
@@ -346,6 +386,8 @@ namespace WalkSpeedTuner::Hotkey {
     std::uint8_t  GetBoostUpMods()   { return g_up_mods.load(std::memory_order_relaxed); }
     std::uint32_t GetBoostDownKey()  { return g_down_key.load(std::memory_order_relaxed); }
     std::uint8_t  GetBoostDownMods() { return g_down_mods.load(std::memory_order_relaxed); }
+    std::uint32_t GetResetKey()      { return g_reset_key.load(std::memory_order_relaxed); }
+    std::uint8_t  GetResetMods()     { return g_reset_mods.load(std::memory_order_relaxed); }
 
     void ResetModifierState() {
         g_ctrl_down.store(false,  std::memory_order_relaxed);
@@ -385,6 +427,8 @@ namespace WalkSpeedTuner::Hotkey {
             g_up_mods.load(std::memory_order_relaxed),
             g_down_key.load(std::memory_order_relaxed),
             g_down_mods.load(std::memory_order_relaxed),
+            g_reset_key.load(std::memory_order_relaxed),
+            g_reset_mods.load(std::memory_order_relaxed),
         };
         return HookLogic::MatchHotkey(encoded, mods, cfg) != HookLogic::HotkeyAction::kNone;
     }

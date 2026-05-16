@@ -1,8 +1,8 @@
 # Walk Speed Tuner
 
-A small SKSE plugin that lets you walk faster in Skyrim SE/AE. Adds a
-configurable boost (0–120%) to your walk speed only — sprint, run, sneak,
-and NPCs are untouched.
+A small SKSE plugin that retunes your walking speed in Skyrim SE/AE. Dial your
+walk speed anywhere from slower than vanilla to well above it, within limits
+you choose. Walk speed only — sprint, run, sneak, and NPCs are untouched.
 
 **Save-clean.** The plugin never writes to your character's actor values.
 Your saves stay byte-identical to vanilla, and removing the DLL takes you
@@ -11,8 +11,10 @@ script residue.
 
 ## Features
 
-- 0–120% walk-speed boost (default: off)
+- Walk faster *or* slower — adjustable within limits you set (default −20% … +140%)
 - **Alt + Mouse Wheel Up / Down** to bump boost ±5% on the fly
+- **Alt + Middle Mouse** to snap walk speed straight back to vanilla
+- On-screen indicator that pops up briefly when you change the boost
 - Optional: vanilla speed during combat (default on)
 - In-game settings panel (with [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352))
 - Hotkeys are rebindable — keyboard or mouse, with Ctrl/Alt/Shift modifiers
@@ -39,10 +41,12 @@ Download the latest `WalkSpeedTuner-vX.Y.Z.zip` from the
 1. Toggle walk gait — Caps Lock by default, or whatever you bound to
    "Always Walk".
 2. Hold **Alt** and scroll the mouse wheel — up to walk faster, down to
-   slow down. Each click changes boost by 5%, up to a maximum of 120%.
+   slow down. Each click changes boost by 5%, within your configured limits.
+3. Press **Alt + Middle Mouse** (wheel click) to snap straight back to
+   vanilla speed.
 
 The boost only applies while you're walking. Sprint, run, and sneak speeds
-are unchanged.
+are unchanged. A negative boost makes you walk slower than vanilla.
 
 ## Settings
 
@@ -52,10 +56,15 @@ are unchanged.
 | Setting                | What it does                                                          |
 | ---------------------- | --------------------------------------------------------------------- |
 | Enable                 | Master toggle. Off = vanilla speed.                                   |
-| Boost (%)              | 0 to 120.                                                             |
+| Boost (%)              | Walk-speed change, within the Lower/Upper limits below.               |
+| Lower limit (%)        | Slowest the boost can go (−50 to 0). Default −20.                     |
+| Upper limit (%)        | Fastest the boost can go (0 to 150). Default 140.                     |
 | Suppress during combat | Revert to vanilla speed during fights.                                |
-| Hotkeys                | Rebind Boost+ / Boost-. Click *Set*, press a key (or modifier+key). ESC cancels. |
-| Reset All              | Restore defaults (boost 0, hotkeys Alt+Wheel).                        |
+| Show speed indicator   | Brief on-screen readout when you change boost with the hotkey.        |
+| Indicator size         | Readout text size, 1.0x to 3.0x the menu font (default 1.6x).         |
+| Indicator placement    | Anchor corner + X/Y nudge. *Preview* shows where it lands.            |
+| Hotkeys                | Rebind Boost+ / Boost- / Reset. Click *Set*, press a key (or modifier+key). ESC cancels. |
+| Reset All              | Restore all settings to defaults.                                     |
 
 **Without SKSEMenuFramework**: edit
 `Data\SKSE\Plugins\WalkSpeedTuner.json` directly. The file is created on
@@ -65,13 +74,26 @@ first run with these defaults:
 {
   "enabled": true,
   "boost_pct": 0.0,
+  "min_limit": -20.0,
+  "max_limit": 140.0,
   "suppress_in_combat": true,
   "boost_up_keycode": 264,
   "boost_up_mods": 2,
   "boost_down_keycode": 265,
-  "boost_down_mods": 2
+  "boost_down_mods": 2,
+  "reset_keycode": 258,
+  "reset_mods": 2,
+  "show_indicator": true,
+  "indicator_position": 0,
+  "indicator_offset_x": 0,
+  "indicator_offset_y": 0,
+  "indicator_scale": 1.6
 }
 ```
+
+`indicator_position`: `0` bottom-right, `1` bottom-center, `2` top-center,
+`3` top-left. `indicator_offset_x` / `indicator_offset_y` nudge it from that
+corner, in pixels.
 
 Quick reference for keycodes / modifiers (SkyUI / MCM-Helper convention):
 

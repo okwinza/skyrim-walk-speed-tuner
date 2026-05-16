@@ -2,6 +2,7 @@
 
 set(SOURCE_FILES
     src/Hotkey.cpp
+    src/Indicator.cpp
     src/InputSuppress.cpp
     src/Main.cpp
     src/MCM.cpp

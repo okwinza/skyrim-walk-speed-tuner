@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include "Hotkey.h"
+#include "Indicator.h"
 #include "InputSuppress.h"
 #include "MCM.h"
 #include "Settings.h"
@@ -18,6 +19,7 @@ namespace {
         auto register_ui = [] {
             WalkSpeedTuner::MCM::Register();
             WalkSpeedTuner::Hotkey::Install();
+            WalkSpeedTuner::Indicator::Install();
         };
         if (auto* task = SKSE::GetTaskInterface()) {
             task->AddTask(register_ui);

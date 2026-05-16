@@ -108,3 +108,27 @@ TEST_CASE("WheelUp without modifier and Ctrl+WheelUp route to different actions"
     REQUIRE(MatchHotkey(0x108, 0,        cfg) == HotkeyAction::kBoostUp);
     REQUIRE(MatchHotkey(0x108, kModCtrl, cfg) == HotkeyAction::kBoostDown);
 }
+
+// ---- v1.8: quick-reset hotkey ------------------------------------------
+
+TEST_CASE("reset chord matches", "[match]") {
+    HotkeyConfig cfg{ 0, 0, 0, 0, /*reset*/ 0x102, kModAlt };
+    REQUIRE(MatchHotkey(0x102, kModAlt, cfg) == HotkeyAction::kReset);
+}
+
+TEST_CASE("unbound reset doesn't fire", "[match]") {
+    HotkeyConfig cfg{ 0x1B, 0, 0x1A, 0, /*reset*/ 0, 0 };
+    REQUIRE(MatchHotkey(0x102, kModAlt, cfg) == HotkeyAction::kNone);
+}
+
+TEST_CASE("reset needs its modifier", "[match]") {
+    HotkeyConfig cfg{ 0, 0, 0, 0, /*reset*/ 0x102, kModAlt };
+    REQUIRE(MatchHotkey(0x102, 0, cfg) == HotkeyAction::kNone);
+}
+
+TEST_CASE("up, down, reset route to distinct actions", "[match]") {
+    HotkeyConfig cfg{ 0x1B, 0, 0x1A, 0, 0x102, kModAlt };
+    REQUIRE(MatchHotkey(0x1B,  0,       cfg) == HotkeyAction::kBoostUp);
+    REQUIRE(MatchHotkey(0x1A,  0,       cfg) == HotkeyAction::kBoostDown);
+    REQUIRE(MatchHotkey(0x102, kModAlt, cfg) == HotkeyAction::kReset);
+}

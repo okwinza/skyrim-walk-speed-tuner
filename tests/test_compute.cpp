@@ -53,3 +53,23 @@ TEST_CASE("zero base with boost", "[compute]") {
     BoostInputs in{ 0.0f, 30.0f, true, true, false, true };
     REQUIRE(ComputeBoosted(in) == 30.0f);
 }
+
+TEST_CASE("negative boost slows you while walking", "[compute]") {
+    BoostInputs in{ 100.0f, -10.0f, true, /*walking*/ true, false, true };
+    REQUIRE(ComputeBoosted(in) == 90.0f);
+}
+
+TEST_CASE("negative boost returns base when disabled", "[compute]") {
+    BoostInputs in{ 100.0f, -10.0f, /*enabled*/ false, true, false, true };
+    REQUIRE(ComputeBoosted(in) == 100.0f);
+}
+
+TEST_CASE("negative boost returns base when not walking", "[compute]") {
+    BoostInputs in{ 100.0f, -10.0f, true, /*walking*/ false, false, true };
+    REQUIRE(ComputeBoosted(in) == 100.0f);
+}
+
+TEST_CASE("negative boost is suppressed in combat", "[compute]") {
+    BoostInputs in{ 100.0f, -10.0f, true, true, /*combat*/ true, /*suppress*/ true };
+    REQUIRE(ComputeBoosted(in) == 100.0f);
+}

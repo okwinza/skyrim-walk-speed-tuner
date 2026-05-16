@@ -10,6 +10,7 @@ add_executable(WalkSpeedTuner_tests
     tests/test_settings.cpp
     tests/test_bump.cpp
     tests/test_match.cpp
+    tests/test_indicator.cpp
     src/SettingsParse.cpp
 )
 
