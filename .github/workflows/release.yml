@@ -55,7 +55,9 @@ jobs:
     needs: test
     timeout-minutes: 60
     permissions:
-      contents: write   # softprops/action-gh-release on tag pushes
+      contents: write       # softprops/action-gh-release on tag pushes
+      id-token: write       # actions/attest-build-provenance — mint OIDC token
+      attestations: write   # actions/attest-build-provenance — write attestation
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,16 +115,80 @@ jobs:
           Copy-Item build/release/bin/WalkSpeedTuner.dll $stage/
           Compress-Archive -Path stage/SKSE -DestinationPath "${{ steps.archive.outputs.name }}.zip"
 
+      # PDB ships as a SEPARATE asset so the user-facing zip stays lean
+      # (MO2 users don't need a 4-5 MB debug file in SKSE/Plugins/). The PDB
+      # is for the audience that wants to decompile and read the binary.
+      - name: Package PDB
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build/release/bin/WalkSpeedTuner.pdb `
+                           -DestinationPath "${{ steps.archive.outputs.name }}-pdb.zip"
+
+      # SHA-256 of both zips, as .sha256 companions AND inlined into the
+      # release body so the hashes are visible on the release page without
+      # having to download anything. Body lines are an array of literal +
+      # interpolated strings — a `@"..."@` here-string would have PowerShell
+      # eat the inline-code backticks in the markdown.
+      - name: Hash + write release body
+        shell: pwsh
+        run: |
+          $base = "${{ steps.archive.outputs.name }}"
+          $repo = "${{ github.repository }}"
+          $hz = (Get-FileHash "$base.zip"     -Algorithm SHA256).Hash.ToLower()
+          $hp = (Get-FileHash "$base-pdb.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hz  $base.zip"     | Out-File "$base.zip.sha256"     -Encoding ascii
+          "$hp  $base-pdb.zip" | Out-File "$base-pdb.zip.sha256" -Encoding ascii
+          @(
+            '## Verify your download',
+            '',
+            'SHA-256:',
+            '```',
+            "$hz  $base.zip",
+            "$hp  $base-pdb.zip",
+            '```',
+            'Compare with `Get-FileHash <file> -Algorithm SHA256` (PowerShell) or',
+            '`sha256sum -c <file>.sha256` (Unix/git-bash).',
+            '',
+            'Cryptographic provenance (requires the `gh` CLI):',
+            '```',
+            "gh attestation verify $base.zip --repo $repo",
+            '```'
+          ) | Out-File release-body.md -Encoding utf8
+
+      # Signed build provenance — anyone can run
+      #   gh attestation verify <file> --repo <repo>
+      # and get GitHub's signed statement that the binary was built by THIS
+      # workflow at THIS commit. Skipped on PR events because fork PRs have
+      # id-token: write stripped by GitHub's fork-safety rules.
+      - name: Attest build provenance
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            build/release/bin/WalkSpeedTuner.dll
+            ${{ steps.archive.outputs.name }}.zip
+            ${{ steps.archive.outputs.name }}-pdb.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.archive.outputs.name }}
-          path: ${{ steps.archive.outputs.name }}.zip
+          path: |
+            ${{ steps.archive.outputs.name }}.zip
+            ${{ steps.archive.outputs.name }}-pdb.zip
+            ${{ steps.archive.outputs.name }}.zip.sha256
+            ${{ steps.archive.outputs.name }}-pdb.zip.sha256
+            release-body.md
           if-no-files-found: error
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.archive.outputs.name }}.zip
+          files: |
+            ${{ steps.archive.outputs.name }}.zip
+            ${{ steps.archive.outputs.name }}-pdb.zip
+            ${{ steps.archive.outputs.name }}.zip.sha256
+            ${{ steps.archive.outputs.name }}-pdb.zip.sha256
+          body_path: release-body.md
           generate_release_notes: true
           fail_on_unmatched_files: true

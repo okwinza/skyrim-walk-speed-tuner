@@ -36,6 +36,13 @@ Download the latest `WalkSpeedTuner-vX.Y.Z.zip` from the
 - **Manual**: extract into your Skyrim `Data\` folder. The DLL lands at
   `Data\SKSE\Plugins\WalkSpeedTuner.dll`.
 
+SHA-256 hashes for each release sit in the release notes — compare your
+download with `Get-FileHash <file> -Algorithm SHA256`. For a cryptographic
+check, install the [`gh` CLI](https://cli.github.com/) and run
+`gh attestation verify <file> --repo okwinza/skyrim-walk-speed-tuner`.
+GitHub will confirm the binary was built by this repo's CI at the tagged
+commit.
+
 ## Usage
 
 1. Toggle walk gait — Caps Lock by default, or whatever you bound to
