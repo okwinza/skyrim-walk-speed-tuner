@@ -43,6 +43,19 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
 )
 
+# Emit a separate PDB next to the DLL for Release-flavoured builds. /Zi has
+# the compiler write debug info; /DEBUG has the linker consolidate it into a
+# final .pdb. Release optimisations stay untouched (no /Ob1 swap as you'd
+# get from switching to RelWithDebInfo). The release workflow ships this
+# PDB as a separate asset for users who want to verify the binary by
+# decompiling.
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        $<$<CONFIG:Release,RelWithDebInfo,MinSizeRel>:/Zi>)
+    target_link_options(${PROJECT_NAME} PRIVATE
+        $<$<CONFIG:Release,RelWithDebInfo,MinSizeRel>:/DEBUG>)
+endif()
+
 target_precompile_headers(${PROJECT_NAME} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/PCH.h"
 )
