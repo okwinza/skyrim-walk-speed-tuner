@@ -2,7 +2,7 @@
 
 A small SKSE plugin that retunes your walking speed in Skyrim SE/AE. Dial your
 walk speed anywhere from slower than vanilla to well above it, within limits
-you choose. Walk speed only — sprint, run, sneak, and NPCs are untouched.
+you choose. Walk speed only — sprint, run, and NPCs are untouched.
 
 **Save-clean.** The plugin never writes to your character's actor values.
 Your saves stay byte-identical to vanilla, and removing the DLL takes you
@@ -52,8 +52,8 @@ commit.
 3. Press **Alt + Middle Mouse** (wheel click) to snap straight back to
    vanilla speed.
 
-The boost only applies while you're walking. Sprint, run, and sneak speeds
-are unchanged. A negative boost makes you walk slower than vanilla.
+The boost only applies while you're walking. Sprint and run speeds are
+unchanged. A negative boost makes you walk slower than vanilla.
 
 ## Settings
 

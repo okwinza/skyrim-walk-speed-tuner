@@ -73,3 +73,32 @@ TEST_CASE("negative boost is suppressed in combat", "[compute]") {
     BoostInputs in{ 100.0f, -10.0f, true, true, /*combat*/ true, /*suppress*/ true };
     REQUIRE(ComputeBoosted(in) == 100.0f);
 }
+
+// --- sprint gate (issue: walking + sprinting both true at once) ---
+
+TEST_CASE("returns base when sprinting even if walking flag is on", "[compute]") {
+    // Player toggled walk gait, then held sprint. ActorState has both bits
+    // set; without the sprint check the boost gets multiplied into sprint
+    // speed and the player rockets across the map.
+    BoostInputs in{ 100.0f, 140.0f, true,
+                    /*walking*/ true, /*combat*/ false, /*suppress*/ true,
+                    /*sprinting*/ true };
+    REQUIRE(ComputeBoosted(in) == 100.0f);
+}
+
+TEST_CASE("negative boost also suppressed while sprinting", "[compute]") {
+    // Symmetric: a walk-slowdown shouldn't drag sprint speed down either.
+    BoostInputs in{ 100.0f, -20.0f, true,
+                    /*walking*/ true, /*combat*/ false, /*suppress*/ true,
+                    /*sprinting*/ true };
+    REQUIRE(ComputeBoosted(in) == 100.0f);
+}
+
+TEST_CASE("sprint gate independent of combat suppression", "[compute]") {
+    // Sprinting blocks the boost regardless of how combat is configured —
+    // proves the new gate isn't tangled with the existing combat one.
+    BoostInputs in{ 100.0f, 50.0f, true,
+                    /*walking*/ true, /*combat*/ false, /*suppress*/ false,
+                    /*sprinting*/ true };
+    REQUIRE(ComputeBoosted(in) == 100.0f);
+}

@@ -56,6 +56,7 @@ namespace WalkSpeedTuner::WalkSpeedHook {
                 st && st->IsWalking(),
                 player->IsInCombat(),
                 g_suppress_in_combat.load(std::memory_order_relaxed),
+                st && st->IsSprinting(),
             };
             const float boosted = HookLogic::ComputeBoosted(in);
 

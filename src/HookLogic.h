@@ -38,12 +38,20 @@ namespace WalkSpeedTuner::HookLogic {
         bool  walking;
         bool  in_combat;
         bool  suppress_in_combat;
+        // Sprint and walk are independent bits in ActorState — both can be
+        // true at once if the player holds the walk-toggle while sprinting.
+        // Without this gate the boost gets multiplied into sprint speed,
+        // which is what users observe as "crazy fast" sprinting when boost
+        // is high. Appended (not inserted) so existing test positional inits
+        // value-init sprinting to false and stay correct.
+        bool  sprinting;
     };
 
     inline bool IsBoostActive(const BoostInputs& in) {
         return in.enabled
             && in.boost_pct != 0.0f
             && in.walking
+            && !in.sprinting
             && !(in.suppress_in_combat && in.in_combat);
     }
 
