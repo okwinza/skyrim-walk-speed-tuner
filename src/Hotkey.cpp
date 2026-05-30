@@ -118,6 +118,17 @@ namespace WalkSpeedTuner::Hotkey {
             }
         }
 
+        // True when any Skyrim menu is on screen (inventory, magic, map,
+        // console, dialogue, main menu, etc.). HUD-only gameplay returns
+        // false. Used to short-circuit action-mode hotkey processing so
+        // vanilla Alt+wheel can navigate menus without bumping the boost.
+        // MCM capture mode runs above this gate (via continue) and is
+        // unaffected.
+        bool AnyGameMenuOpen() {
+            const auto* ui = RE::UI::GetSingleton();
+            return ui && ui->IsShowingMenus();
+        }
+
         // Logs any pair of the three hotkeys bound to the same chord. The
         // matcher checks up, then down, then reset, so on a clash the
         // earlier-listed action wins and the later one goes dead.
@@ -221,6 +232,11 @@ namespace WalkSpeedTuner::Hotkey {
                                              std::memory_order_relaxed);
                     continue;
                 }
+
+                // Vanilla menu (inventory, map, magic, system, console,
+                // dialogue, main menu, etc.) is up — let the user navigate
+                // it with their normal Alt+wheel without bumping the boost.
+                if (AnyGameMenuOpen()) continue;
 
                 if (!any_bound) continue;
 
@@ -413,6 +429,11 @@ namespace WalkSpeedTuner::Hotkey {
 
     bool ShouldSuppressForChord(const RE::ButtonEvent* ev) {
         if (!ev) return false;
+        // Don't suppress while a menu is up — vanilla menu wheel-nav must
+        // pass through. PlayerInputHandler::ProcessButton on camera states
+        // is typically inactive in menu mode already, so this is mainly
+        // an explicit contract for future hook expansion.
+        if (AnyGameMenuOpen()) return false;
         // Mouse-only: keyboard keys never trigger vanilla camera, and
         // modifier-key chords (Ctrl/Alt/Shift) couldn't match a keyboard
         // key whose code IS the modifier (since the modifier is held).
