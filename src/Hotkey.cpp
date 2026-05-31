@@ -118,15 +118,17 @@ namespace WalkSpeedTuner::Hotkey {
             }
         }
 
-        // True when any Skyrim menu is on screen (inventory, magic, map,
-        // console, dialogue, main menu, etc.). HUD-only gameplay returns
-        // false. Used to short-circuit action-mode hotkey processing so
-        // vanilla Alt+wheel can navigate menus without bumping the boost.
-        // MCM capture mode runs above this gate (via continue) and is
-        // unaffected.
+        // True when a pause-flagged menu is on screen — inventory, magic,
+        // map, quests, system, main menu, dialogue, etc. HUD-only gameplay
+        // returns false (the HUD is technically a menu in Skyrim's stack,
+        // so IsShowingMenus would always be true; numPausesGame is the
+        // right discriminator). Used to short-circuit action-mode hotkey
+        // processing so vanilla Alt+wheel can navigate menus without
+        // bumping the boost. MCM capture mode runs above this gate (via
+        // continue) and is unaffected.
         bool AnyGameMenuOpen() {
-            const auto* ui = RE::UI::GetSingleton();
-            return ui && ui->IsShowingMenus();
+            auto* ui = RE::UI::GetSingleton();
+            return ui && ui->GameIsPaused();
         }
 
         // Logs any pair of the three hotkeys bound to the same chord. The
