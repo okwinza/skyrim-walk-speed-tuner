@@ -116,6 +116,12 @@ Cache-refresh trick adapted from
 (Apache-2.0). Built on
 [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG).
 
+## License
+
+MIT — see [LICENSE](LICENSE). Third-party code keeps its own license:
+`extern/CommonLibSSE-NG` (submodule) and `external/SKSEMenuFramework.h`
+(SKSEMenuFramework API header).
+
 ---
 
 # For developers
