@@ -22,15 +22,16 @@ script residue.
 
 ## Requirements
 
-- Skyrim Special Edition / Anniversary Edition (1.6.x) with
-  [SKSE64](https://skse.silverlock.org/)
+- Skyrim Special Edition 1.5.97 or Anniversary Edition 1.6.x / 1.7.x
+  (up to 1.7.104) with [SKSE64](https://skse.silverlock.org/) and
+  [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444)
 - Optional: [SKSEMenuFramework](https://www.nexusmods.com/skyrimspecialedition/mods/120352)
   for the in-game settings panel
 
 ## Installation
 
 Download the latest `WalkSpeedTuner-vX.Y.Z.zip` from the
-[Releases](https://github.com/<owner>/WalkSpeedTuner/releases) page, then:
+[Releases](https://github.com/okwinza/skyrim-walk-speed-tuner/releases) page, then:
 
 - **Mod Organizer 2 / Vortex**: drag the zip into your manager and install.
 - **Manual**: extract into your Skyrim `Data\` folder. The DLL lands at
@@ -114,13 +115,25 @@ Quick reference for keycodes / modifiers (SkyUI / MCM-Helper convention):
 Cache-refresh trick adapted from
 [TES5-DynamicSpeedController](https://github.com/DanjelPiDev/TES5-DynamicSpeedController)
 (Apache-2.0). Built on
-[CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG).
+[CommonLibSSE-NG](https://github.com/alandtse/CommonLibSSE-NG).
+Skyrim 1.7.104 support contributed by
+[SynysterZV](https://github.com/SynysterZV).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Third-party code keeps its own license:
-`extern/CommonLibSSE-NG` (submodule) and `external/SKSEMenuFramework.h`
-(SKSEMenuFramework API header).
+The source code in this repository is MIT — see [LICENSE](LICENSE).
+Third-party code keeps its own license:
+
+- `extern/CommonLibSSE-NG` (git submodule) is GPL-3.0-or-later with the
+  exceptions in its `EXCEPTIONS.md` (MIT up to the version used by v1.5.4).
+- `external/SKSEMenuFramework.h` is the SKSE Menu Framework API header,
+  MIT ([SKSE-Menu-Framework-2-Example](https://github.com/Thiago099/SKSE-Menu-Framework-2-Example)).
+
+CommonLibSSE-NG is statically linked, so release DLLs from v1.5.5 on are
+combined works distributed under GPL-3.0-or-later. Their corresponding
+source is this repository at the release tag together with the
+CommonLibSSE-NG commit pinned by the submodule (`git clone --recursive`;
+GitHub's "Source code" archives leave the submodule out).
 
 ---
 
