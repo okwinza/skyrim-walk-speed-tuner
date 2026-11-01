@@ -136,8 +136,10 @@ jobs:
           $repo = "${{ github.repository }}"
           $hz = (Get-FileHash "$base.zip"     -Algorithm SHA256).Hash.ToLower()
           $hp = (Get-FileHash "$base-pdb.zip" -Algorithm SHA256).Hash.ToLower()
-          "$hz  $base.zip"     | Out-File "$base.zip.sha256"     -Encoding ascii
-          "$hp  $base-pdb.zip" | Out-File "$base-pdb.zip.sha256" -Encoding ascii
+          # LF line endings: `sha256sum -c` treats a trailing CR as part of
+          # the filename, and Out-File would write CRLF on the Windows runner.
+          [IO.File]::WriteAllText("$PWD/$base.zip.sha256",     "$hz  $base.zip`n")
+          [IO.File]::WriteAllText("$PWD/$base-pdb.zip.sha256", "$hp  $base-pdb.zip`n")
           @(
             '## Verify your download',
             '',
